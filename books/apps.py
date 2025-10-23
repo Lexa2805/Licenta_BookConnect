@@ -1,15 +1,13 @@
-# Licenta_BookConnect/apps.py
 from django.apps import AppConfig
-from mongoengine import connect
-from django.conf import settings
 
 class BooksConfig(AppConfig):
-    """Inițializează conexiunea MongoEngine la pornirea aplicației Django."""
+    default_auto_field = "django.db.models.BigAutoField"
     name = "books"
 
-    def ready(self) -> None:
-        connect(
-            db=settings.MONGO_DB,
-            host=settings.MONGO_URI,
-            uuidRepresentation="standard",
-        )
+    def ready(self):
+        from django.conf import settings
+        from mongoengine import connect
+
+        uri = getattr(settings, "MONGO_URI", "mongodb://localhost:27017")
+        db  = getattr(settings, "MONGO_DB",  "WebAppDB")
+        connect(host=uri, db=db)  # alias-ul default e ok
