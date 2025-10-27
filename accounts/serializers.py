@@ -1,28 +1,43 @@
-from django.contrib.auth.models import User
-from rest_framework import serializers
-from .models import UserProfile
+# from rest_framework import serializers
+# from .models_mongo import Users
+#
+#
+# class RegisterSerializer(serializers.Serializer):
 
-class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
-    role = serializers.ChoiceField(choices=UserProfile.ROLE_CHOICES, default="reader")
-
-    class Meta:
-        model = User
-        fields = ["username", "email", "password", "role"]
-
-    def create(self, validated):
-        role = validated.pop("role", "reader")
-        user = User.objects.create_user(**validated)
-        user.profile.role = role  # creat din signal
-        user.profile.save()
-        return user
-
-class MeSerializer(serializers.ModelSerializer):
-    role = serializers.SerializerMethodField()
-
-    class Meta:
-        model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "role"]
-
-    def get_role(self, obj):
-        return getattr(obj.profile, "role", "reader")
+#     username = serializers.CharField(required=True)
+#     email = serializers.EmailField(required=True)
+#     password = serializers.CharField(write_only=True, min_length=6)
+#     role = serializers.ChoiceField(
+#         choices=["reader", "author", "admin"],
+#         default="reader",
+#         required=False,
+#     )
+#
+#     def validate_username(self, value):
+#         if Users.objects(username=value).first():
+#             raise serializers.ValidationError("Username deja folosit")
+#         return value
+#
+#     def validate_email(self, value):
+#         if Users.objects(email=value.lower()).first():
+#             raise serializers.ValidationError("Email deja folosit")
+#         return value.lower()
+#
+#     def create(self, validated_data):
+#         role = validated_data.pop("role", "reader")
+#         user = Users(
+#             username=validated_data["username"],
+#             email=validated_data["email"],
+#             role=role,
+#         )
+#         user.set_password(validated_data["password"])
+#         user.save()
+#         return user
+#
+#
+# class MeSerializer(serializers.Serializer):
+#
+#     id = serializers.CharField()
+#     username = serializers.CharField()
+#     email = serializers.EmailField()
+#     role = serializers.CharField()

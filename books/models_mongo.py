@@ -3,15 +3,13 @@ from datetime import datetime
 from mongoengine import Document, EmbeddedDocument, fields
 
 class Price(EmbeddedDocument):
-    """Prețul unei cărți digitale."""
     amount: float = fields.FloatField(required=True)
     currency: str = fields.StringField(default="RON")
 
 class Book(Document):
-    """Cartea digitală publicată pe platformă."""
     meta = {
         "collection": "books",
-        "strict": False,   # <— permite câmpuri care NU sunt definite în model
+        "strict": False,
     }
 
     title: str = fields.StringField(required=True)

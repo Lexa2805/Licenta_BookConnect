@@ -1,38 +1,44 @@
 "use client";
+
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
 import { useAuth } from "@/store/auth";
 
-export default function Dashboard() {
-  const { accessToken, user, setUser, logout } = useAuth();
+export default function DashboardPage() {
   const router = useRouter();
+    const { user, token } = useAuth();
 
   useEffect(() => {
-    if (!accessToken) {
-      router.replace("/login");
-      return;
+    if (!token) {
+      router.push("/login");
     }
-    if (!user) {
-      api.get("/auth/me/").then(r => setUser(r.data)).catch(() => logout());
-    }
-  }, [accessToken, user]);
+  }, [token, router]);
 
-  if (!accessToken) return null;
+  if (!token) {
+    return (
+      <main className="min-h-dvh flex items-center justify-center text-white">
+        <div>Redirecționare...</div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="min-h-dvh flex items-center justify-center text-white">
+        <div>Se încarcă profilul...</div>
+      </main>
+    );
+  }
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <p className="mt-2 opacity-80">
-        Salut, <b>{user?.username}</b> — rol: <b>{user?.role}</b>
-      </p>
-
-      {user?.role === "author" && (
-        <div className="mt-6 border rounded p-4">Zona autor: publică / editează cărți</div>
-      )}
-      {user?.role === "admin" && (
-        <div className="mt-6 border rounded p-4">Zona admin: management utilizatori / rapoarte</div>
-      )}
+    <main className="min-h-dvh flex items-center justify-center text-white">
+      <div className="border rounded-xl p-6">
+        <h1 className="text-xl font-semibold mb-2">
+          Bun venit, {user.username}! 🎉
+        </h1>
+        <p>Rol: {user.role}</p>
+        <p>Email: {user.email}</p>
+      </div>
     </main>
   );
 }

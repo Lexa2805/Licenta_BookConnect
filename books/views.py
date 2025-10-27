@@ -14,7 +14,7 @@ def _parse_bool(val: str | None):
     return val.lower() in {"1", "true", "t", "yes", "y"}
 
 class BooksViewSet(viewsets.ViewSet):
-    """Listare / căutare / creare cărți în MongoDB."""
+
 
     @extend_schema(
         parameters=[
@@ -27,16 +27,14 @@ class BooksViewSet(viewsets.ViewSet):
         ]
     )
     def list(self, request):
-        qs = Book.objects  # MongoEngine QuerySet
+        qs = Book.objects
         params = request.query_params
 
-        # 1) full-text dacă primești ?q=...
+
         q = params.get("q")
         if q:
-            # necesită un text index în Mongo (vezi comanda mai jos)
             qs = qs(__raw__={"$text": {"$search": q}})
 
-        # 2) filtre „conține” (case-insensitive)
         title = params.get("title")
         if title:
             qs = qs.filter(title__icontains=title)
@@ -54,7 +52,6 @@ class BooksViewSet(viewsets.ViewSet):
         if is_free is not None:
             qs = qs.filter(is_free=is_free)
 
-        # sortare & limit
         limit = int(params.get("limit") or 50)
         books = qs.order_by("-published_at").limit(limit)
 
@@ -71,7 +68,7 @@ class BooksViewSet(viewsets.ViewSet):
     def retrieve(self, request, pk=None):
         """Detalii carte — pe ID (stabil)."""
         try:
-            b = Book.objects.get(id=pk)  # ← păstrăm pe id
+            b = Book.objects.get(id=pk)
         except (DoesNotExist, MEValidationError):
             raise Http404("Book not found")
 
