@@ -8,7 +8,7 @@ export default function DashboardPage() {
   const router = useRouter();
     const { user, token } = useAuth();
 
-  useEffect(() => {
+  useEffect(() => {     
     if (!token) {
       router.push("/login");
     }

@@ -1,118 +1,128 @@
-# books/views.py
-from rest_framework import viewsets, status
-from rest_framework.response import Response
+from typing import Any, Dict, List, Optional
 from django.http import Http404
-from mongoengine.errors import DoesNotExist, ValidationError as MEValidationError
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, viewsets
 
-from .serializers import BookCreateSerializer
-from .models_mongo import Book, Price
+from .models_mongo import Book
 
-def _parse_bool(val: str | None):
-    if val is None:
+
+def _normalize_cover(b: Book) -> Optional[str]:
+    """
+    Ia coperta din oricare dintre câmpurile posibile din Mongo
+    și o curăță de spații/virgule de la final.
+    """
+    raw = (
+        getattr(b, "cover_url", None)
+        or getattr(b, "coverImage", None)
+        or getattr(b, "cover_image", None)
+        or getattr(b, "cover", None)
+        or getattr(b, "image", None)
+    )
+    if not raw:
         return None
-    return val.lower() in {"1", "true", "t", "yes", "y"}
+    if not isinstance(raw, str):
+        return None
+    # ex: "sherlock.jpg," -> "sherlock.jpg"
+    return raw.strip().rstrip(",; ")
+
+
+def _normalize_authors(b: Book) -> List[str]:
+    """
+    Întoarce mereu o listă de autori.
+    Dacă în DB ai 'authors': [...], o ia direct.
+    Dacă ai doar 'author': "Arthur Conan Doyle" o transformă în listă.
+    Dacă ai autor ca ObjectId, îl ignoră.
+    """
+    # cazul ideal: avem listă
+    authors: List[str] = []
+    raw_authors = getattr(b, "authors", None)
+    if raw_authors:
+        # poate fi deja listă
+        if isinstance(raw_authors, list):
+            authors = [a for a in raw_authors if a]
+        elif isinstance(raw_authors, str):
+            authors = [raw_authors]
+    else:
+        # nu avem 'authors', încercăm 'author'
+        single = getattr(b, "author", None)
+        if isinstance(single, str) and single.strip():
+            candidate = single.strip()
+            # dacă arată ca un ObjectId, nu îl punem
+            if not (len(candidate) == 24 and all(c in "0123456789abcdefABCDEF" for c in candidate)):
+                authors = [candidate]
+    return authors
+
+
+def _serialize_book(b: Book) -> Dict[str, Any]:
+    cover_clean = _normalize_cover(b)
+    authors = _normalize_authors(b)
+
+    return {
+        "id": str(b.id),
+        "title": getattr(b, "title", ""),
+        "authors": authors,
+        "genres": getattr(b, "genres", []),
+        "description": getattr(b, "description", None),
+        # IMPORTANT: trimitem mereu 'cover_url' către frontend
+        "cover_url": cover_clean,
+        "is_free": getattr(b, "is_free", getattr(b, "isFree", False)),
+        "price": (
+            {
+                "amount": b.price.amount,
+                "currency": b.price.currency,
+            }
+            if getattr(b, "price", None)
+            else None
+        ),
+    }
+
+
+class HomeDataView(APIView):
+    """
+    /api/home-data/
+    Returnează ultimele cărți, cărți gratuite și genurile,
+    cu câmpuri normalizate (cover_url, authors).
+    """
+
+    def get(self, request, *args: Any, **kwargs: Any) -> Response:
+        latest_qs = Book.objects.order_by("-published_at").limit(8)
+        free_qs = Book.objects(is_free=True).order_by("-published_at").limit(6)
+
+        # genuri
+        raw_genres = Book.objects.distinct("genres")
+        genres: List[str] = []
+        for g in raw_genres:
+            if isinstance(g, list):
+                for sub in g:
+                    if sub and sub not in genres:
+                        genres.append(sub)
+            else:
+                if g and g not in genres:
+                    genres.append(g)
+
+        data: Dict[str, Any] = {
+            "latest": [_serialize_book(b) for b in latest_qs],
+            "free": [_serialize_book(b) for b in free_qs],
+            "genres": genres,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
 
 class BooksViewSet(viewsets.ViewSet):
+    """
+    Dacă îl mai folosești în urls, îl lăsăm.
+    """
 
+    def list(self, request) -> Response:
+        books = Book.objects.order_by("-published_at").limit(50)
+        return Response([_serialize_book(b) for b in books], status=status.HTTP_200_OK)
 
-    @extend_schema(
-        parameters=[
-            OpenApiParameter(name="q", description="Căutare full-text (dacă ai text index în Mongo).", required=False, type=str),
-            OpenApiParameter(name="title", description="Filtru conține în titlu (case-insensitive).", required=False, type=str),
-            OpenApiParameter(name="author", description="Filtru autor (în lista de autori).", required=False, type=str),
-            OpenApiParameter(name="genre", description="Filtru gen (în lista de genuri).", required=False, type=str),
-            OpenApiParameter(name="is_free", description="true/false", required=False, type=bool),
-            OpenApiParameter(name="limit", description="Număr maxim de rezultate (default 50).", required=False, type=int),
-        ]
-    )
-    def list(self, request):
-        qs = Book.objects
-        params = request.query_params
-
-
-        q = params.get("q")
-        if q:
-            qs = qs(__raw__={"$text": {"$search": q}})
-
-        title = params.get("title")
-        if title:
-            qs = qs.filter(title__icontains=title)
-
-        author = params.get("author")
-        if author:
-            qs = qs.filter(authors__icontains=author)
-
-        genre = params.get("genre")
-        if genre:
-            qs = qs.filter(genres__icontains=genre)
-
-        # 3) is_free
-        is_free = _parse_bool(params.get("is_free"))
-        if is_free is not None:
-            qs = qs.filter(is_free=is_free)
-
-        limit = int(params.get("limit") or 50)
-        books = qs.order_by("-published_at").limit(limit)
-
-        return Response([
-            {
-                "id": str(b.id),
-                "title": b.title,
-                "authors": b.authors,
-                "is_free": getattr(b, "is_free", True),
-                "cover_url": getattr(b, "cover_url", None),
-            } for b in books
-        ])
-
-    def retrieve(self, request, pk=None):
-        """Detalii carte — pe ID (stabil)."""
+    def retrieve(self, request, pk: Optional[str] = None) -> Response:
+        if pk is None:
+            raise Http404("Book not found")
         try:
             b = Book.objects.get(id=pk)
-        except (DoesNotExist, MEValidationError):
+        except Exception:
             raise Http404("Book not found")
-
-        price = None
-        if getattr(b, "price", None):
-            price = {
-                "amount": getattr(b.price, "amount", None),
-                "currency": getattr(b.price, "currency", None),
-            }
-
-        return Response({
-            "id": str(b.id),
-            "title": b.title,
-            "authors": b.authors,
-            "genres": b.genres,
-            "description": getattr(b, "description", None),
-            "cover_url": getattr(b, "cover_url", None),
-            "file_urls": getattr(b, "file_urls", {}),
-            "is_free": getattr(b, "is_free", True),
-            "published_at": getattr(b, "published_at", None),
-            "price": price,
-            "stats": getattr(b, "stats", {}),
-        })
-
-    @extend_schema(request=BookCreateSerializer)
-    def create(self, request):
-        ser = BookCreateSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        v = ser.validated_data
-
-        price = None
-        if not v.get("is_free", True) and v.get("price_amount") is not None:
-            price = Price(amount=v["price_amount"], currency=v.get("price_currency", "LEI"))
-
-        b = Book(
-            title=v["title"],
-            authors=v.get("authors", []),
-            genres=v.get("genres", []),
-            description=v.get("description", ""),
-            cover_url=v.get("cover_url") or None,
-            file_urls={},
-            price=price,
-            is_free=v.get("is_free", True),
-            owner_user_id=str(getattr(request.user, "id", "")) or "anon",
-        )
-        b.save()
-        return Response({"id": str(b.id)}, status=status.HTTP_201_CREATED)
+        return Response(_serialize_book(b), status=status.HTTP_200_OK)

@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from books.views import BooksViewSet
 from accounts.views import RegisterView, LoginView, MeView
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -10,11 +9,11 @@ from drf_spectacular.views import (
 )
 
 router = DefaultRouter()
-router.register(r"books", BooksViewSet, basename="books")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/books/", include("books.urls")),
+    path("api/", include("accounts.urls")),
+    path("api/", include("books.urls")),
 
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
