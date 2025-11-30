@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    min-height: 100vh;
+    @apply bg-gradient-to-br from-amber-50 via-orange-50 to-rose-100 dark:from-amber-950 dark:via-orange-950 dark:to-amber-900;
+}
+
+/* Global Button Style Class */
+.btn-primary {
+    @apply bg-gradient-to-r from-amber-700 to-orange-800 dark:from-amber-800 dark:to-orange-900 text-white font-semibold py-2 px-4 rounded-xl hover:from-amber-800 hover:to-orange-900 dark:hover:from-amber-900 dark:hover:to-orange-950 transition-all duration-200 shadow-md hover:shadow-lg;
+}
+
+.btn-secondary {
+    @apply bg-white/80 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700/50 text-amber-900 dark:text-amber-100 font-semibold py-2 px-4 rounded-xl hover:bg-white dark:hover:bg-amber-900/60 transition-all duration-200 shadow-sm hover:shadow-md;
+}

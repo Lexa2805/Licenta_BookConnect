@@ -2,9 +2,10 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from datetime import timedelta
-load_dotenv()
 
+# Load .env from project root (parent of backend folder)
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR.parent / ".env")
 
 DEBUG = os.getenv("DEBUG", "1") == "1"
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]").split(",")
@@ -30,15 +31,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "accounts.auth_backend.MongoJWTAuthentication",
-    ],
+    # Authentication is now handled by Next.js with NextAuth
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
@@ -57,12 +58,16 @@ INSTALLED_APPS = [
     "rest_framework",
     "books.apps.BooksConfig",
     "reviews.apps.ReviewsConfig",
+    "marketplace.apps.MarketplaceConfig",
+    "manuscripts.apps.ManuscriptsConfig",
+    "chat.apps.ChatConfig",
     "drf_spectacular",
     "drf_spectacular_sidecar",
     "corsheaders",
-    "accounts",
-
 ]
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",

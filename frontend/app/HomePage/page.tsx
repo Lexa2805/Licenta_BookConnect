@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useTheme } from "../theme-provider";
 
 type Price = {
   amount: number;
@@ -25,6 +26,7 @@ type HomeData = {
 };
 
 export default function HomePage() {
+  const { theme, toggleTheme } = useTheme();
   const [data, setData] = useState<HomeData>({
     latest: [],
     free: [],
@@ -40,71 +42,60 @@ export default function HomePage() {
         setData(res.data);
       })
       .catch((e) => {
-        setErr("Nu s-au putut încărca cărțile.");
-        console.error(e);
+        setErr("Could not load books. Make sure the backend server is running on http://127.0.0.1:8000");
+        console.error("API Error:", e.message);
+        console.error("Check if Django server is running: python manage.py runserver");
       })
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
-      <main className="min-h-dvh flex items-center justify-center bg-slate-100">
-        <p className="text-slate-500">Se încarcă...</p>
+      <main className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-rose-100 dark:from-amber-950 dark:via-orange-950 dark:to-amber-900">
+        <p className="text-gray-800 dark:text-amber-100">Loading...</p>
       </main>
     );
   }
 
   if (err) {
     return (
-      <main className="min-h-dvh flex items-center justify-center bg-slate-100">
-        <p className="text-red-500">{err}</p>
+      <main className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-rose-100 dark:from-amber-950 dark:via-orange-950 dark:to-amber-900 p-6">
+        <div className="bg-white/60 dark:bg-amber-900/40 backdrop-blur-xl border border-red-200 dark:border-red-500/50 rounded-xl p-6 max-w-lg">
+          <p className="text-red-600 dark:text-red-300">{err}</p>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-dvh bg-gradient-to-b from-slate-100 via-white to-slate-100">
-      {/* HERO */}
-      <header className="bg-white/70 backdrop-blur sticky top-0 z-10 border-b">
-        <div className="max-w-6xl mx-auto flex items-center justify-between py-4 px-4 md:px-0">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-500 text-white rounded-lg flex items-center justify-center font-bold">
-              B
-            </div>
-            <span className="font-semibold text-slate-800 text-lg">
-              BookConnect
-            </span>
-          </div>
-          {/* aici pui userul logat mai târziu */}
-        </div>
-      </header>
-
+    <main className="min-h-dvh bg-gradient-to-br from-amber-50 via-orange-50 to-rose-100 dark:from-amber-950 dark:via-orange-950 dark:to-amber-900">
       <section className="max-w-6xl mx-auto px-4 md:px-0 py-10">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 flex items-center gap-2">
-              Bine ai venit în BookConnect
-              <span className="text-2xl"></span>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-orange-400 flex items-center gap-2">
+              Welcome to BookConnect
+              <span className="text-2xl">📚</span>
             </h1>
-            <p className="text-slate-500 mt-2 max-w-2xl">
+            <p className="text-gray-600 dark:text-orange-300 mt-2 max-w-2xl">
+              Discover and explore amazing books
             </p>
           </div>
-          <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 text-sm text-indigo-700">
-            {data.latest.length} cărți noi disponibile 📚
+          <div className="bg-amber-50 dark:bg-amber-800/30 border border-amber-200 dark:border-amber-700/50 rounded-xl px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+            {data.latest.length} new books available 📚
           </div>
         </div>
 
-        {/* GENURI */}
+        {/* GENRES */}
         <section className="mb-10">
-          <h2 className="text-xl font-semibold text-slate-800 mb-3">Genuri</h2>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-orange-300 mb-3">Genres</h2>
           <div className="flex flex-wrap gap-3">
             {data.genres.length === 0 ? (
-              <p className="text-slate-400">Nu există genuri de afișat.</p>
+              <p className="text-gray-400 dark:text-orange-300/60">No genres to display.</p>
             ) : (
               data.genres.map((g) => (
                 <button
                   key={g}
-                  className="px-4 py-1.5 rounded-full bg-white border text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 transition text-sm"
+                  className="px-4 py-1.5 rounded-full bg-white dark:bg-amber-800/30 border border-amber-200 dark:border-amber-700/50 text-gray-700 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-700/40 hover:border-amber-300 dark:hover:border-amber-600 transition text-sm"
                 >
                   {g}
                 </button>
@@ -113,32 +104,35 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ULTIMELE CĂRȚI */}
+        {/* LATEST BOOKS */}
         <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-slate-800">
-              Ultimele cărți
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-orange-300">
+              Latest Books
             </h2>
-            {/* buton vezi toate */}
-            <button className="text-sm text-indigo-600 hover:text-indigo-800">
-              Vezi toate →
+            <button className="text-sm text-amber-700 dark:text-orange-400 hover:text-amber-900 dark:hover:text-orange-300">
+              See all →
             </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {data.latest.map((book) => (
-              <BookCard key={book.id} book={book} />
-            ))}
+            {data.latest.length === 0 ? (
+              <p className="text-gray-400 dark:text-orange-300/60 col-span-full text-center py-8">No books available yet.</p>
+            ) : (
+              data.latest.map((book) => (
+                <BookCard key={book.id} book={book} />
+              ))
+            )}
           </div>
         </section>
 
-        {/* FREE */}
+        {/* FREE BOOKS */}
         <section className="mb-10">
-          <h2 className="text-xl font-semibold text-slate-800 mb-4">
-            Lecturi gratuite
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-orange-300 mb-4">
+            Free Reads
           </h2>
           {data.free.length === 0 ? (
-            <p className="text-slate-400">Nu sunt cărți gratuite acum.</p>
+            <p className="text-gray-400 dark:text-orange-300/60 text-center py-8">No free books available right now.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               {data.free.map((book) => (
@@ -152,11 +146,11 @@ export default function HomePage() {
   );
 }
 function BookCard({ book }: { book: any }) {
-  // 1) fallback dacă nu avem poză deloc
+  // 1) Fallback image if no cover available
   const fallback =
     "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600&q=80&auto=format&fit=crop";
 
-  // 2) luăm coperta din ORICE nume de câmp vine din backend
+  // 2) Get cover from any field name coming from backend
   const rawCover: string | null =
     book.cover_url ??
     book.coverImage ??
@@ -165,40 +159,39 @@ function BookCard({ book }: { book: any }) {
     book.image ??
     null;
 
-  // 3) o curățăm (tu ai în Mongo "sherlock.jpg," → să scoatem virgula)
+  // 3) Clean it (remove trailing commas/semicolons)
   const cleanedCover =
     typeof rawCover === "string"
       ? rawCover.trim().replace(/[,;]+$/, "")
       : "";
 
-  // 4) construim src-ul
+  // 4) Build the src URL
   const coverSrc =
     cleanedCover.length > 0
       ? cleanedCover.startsWith("http")
-        ? cleanedCover // e link complet
-        : `/covers/${cleanedCover}` // e doar numele: "sherlock.jpg" → /covers/sherlock.jpg
+        ? cleanedCover // Full URL
+        : `/covers/${cleanedCover}` // Just filename: "sherlock.jpg" → /covers/sherlock.jpg
       : fallback;
 
-  // 5) AUTORUL
-  let authorText = "Autor necunoscut";
+  // 5) AUTHOR
+  let authorText = "Unknown Author";
 
   if (Array.isArray(book.authors) && book.authors.length > 0) {
     authorText = book.authors.join(", ");
   } else if (typeof book.author === "string" && book.author.trim() !== "") {
     const candidate = book.author.trim();
-    // dacă e ObjectId, nu îl afișăm ca nume
+    // If it looks like ObjectId, don't display it as name
     const looksLikeObjectId = /^[a-fA-F0-9]{24}$/.test(candidate);
-    authorText = looksLikeObjectId ? "Autor necunoscut" : candidate;
+    authorText = looksLikeObjectId ? "Unknown Author" : candidate;
   }
 
-  // 6) dacă tot nu avem copertă după toate astea, logăm cartea → vezi în consolă exact ce câmp are
+  // 6) Log books without cover for debugging
   if (!cleanedCover) {
-    // asta o vezi în DevTools -> Console
-    console.log("CARTE FARA COVER:", book);
+    console.log("BOOK WITHOUT COVER:", book);
   }
 
   return (
-    <article className="bg-white rounded-2xl overflow-hidden shadow-sm border hover:shadow-md transition flex flex-col">
+    <article className="bg-white dark:bg-amber-900/30 rounded-2xl overflow-hidden shadow-sm border border-amber-200 dark:border-amber-700/50 hover:shadow-md transition flex flex-col">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={coverSrc}
@@ -206,25 +199,25 @@ function BookCard({ book }: { book: any }) {
         className="w-full h-44 object-cover"
       />
       <div className="p-4 flex-1 flex flex-col">
-        <h3 className="font-semibold text-slate-900 line-clamp-2 mb-1">
+        <h3 className="font-semibold text-gray-900 dark:text-amber-100 line-clamp-2 mb-1">
           {book.title}
         </h3>
-        <p className="text-sm text-slate-500 mb-3">{authorText}</p>
+        <p className="text-sm text-gray-600 dark:text-orange-300 mb-3">{authorText}</p>
         <div className="mt-auto flex items-center justify-between">
           {book.is_free ? (
-            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-              Gratuit
+            <span className="text-xs bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-2 py-1 rounded-full">
+              Free
             </span>
           ) : book.price ? (
-            <span className="text-sm font-semibold text-slate-800">
+            <span className="text-sm font-semibold text-gray-800 dark:text-amber-200">
               {book.price.amount} {book.price.currency}
             </span>
           ) : (
-            <span className="text-xs text-slate-300">—</span>
+            <span className="text-xs text-gray-300 dark:text-amber-700">—</span>
           )}
 
-          <button className="text-sm text-indigo-600 hover:text-indigo-800">
-            Deschide
+          <button className="text-sm text-amber-700 dark:text-orange-400 hover:text-amber-900 dark:hover:text-orange-300">
+            Open
           </button>
         </div>
       </div>

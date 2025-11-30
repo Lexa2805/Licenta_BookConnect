@@ -8,15 +8,13 @@ type UserData = {
 };
 
 type AuthState = {
-  token: string | null;
   user: UserData | null;
-  setToken: (t: string | null) => void;
   setUser: (u: UserData | null) => void;
 };
 
+// Note: With NextAuth, we primarily use useSession() hook
+// This store can be used for additional client-side state if needed
 export const useAuth = create<AuthState>((set) => ({
-  token: null,
   user: null,
-  setToken: (t) => set({ token: t }),
   setUser: (u) => set({ user: u }),
 }));

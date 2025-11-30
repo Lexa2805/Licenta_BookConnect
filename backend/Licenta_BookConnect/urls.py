@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from accounts.views import RegisterView, LoginView, MeView
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
@@ -12,7 +11,7 @@ router = DefaultRouter()
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/", include("accounts.urls")),
+    # Auth is now handled by Next.js
     path("api/", include("books.urls")),
 
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
@@ -20,13 +19,14 @@ urlpatterns = [
     path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 
     path("api/reviews/", include("reviews.urls")),
-
-    path("api/auth/register/", RegisterView.as_view()),
-    path("api/auth/login/", LoginView.as_view()),
-    path("api/auth/me/", MeView.as_view()),
-
-    path("auth/register/", RegisterView.as_view()),
-    path("auth/login/", LoginView.as_view()),
-    path("auth/me/", MeView.as_view()),
+    path("api/marketplace/", include("marketplace.urls")),
+    path("api/manuscripts/", include("manuscripts.urls")),
+    path("api/chat/", include("chat.urls")),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
