@@ -1,18 +1,72 @@
 from rest_framework import serializers
-from .models import Listing, Payout
+from .models import Listing, Payout, Review
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = '__all__'
+        read_only_fields = ('created_at',)
+
 
 class ListingSerializer(serializers.ModelSerializer):
+    reviews = ReviewSerializer(many=True, read_only=True)
+    average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Listing
         fields = '__all__'
-        read_only_fields = ('seller_id', 'created_at', 'updated_at', 'status')
+        read_only_fields = ('created_at', 'updated_at', 'status')
 
-    def create(self, validated_data):
-        # In a real app, we'd get the user ID from the request (e.g. JWT token)
-        # For now, we might need to pass it or extract it from the request context if available
-        # Since auth is handled by Next.js, we might expect the user ID to be passed in the body or header
-        # Let's assume for now it's passed in the body or we handle it in the view
-        return super().create(validated_data)
+    def get_average_rating(self, obj):
+        reviews = obj.reviews.all()
+        if reviews:
+            return sum(r.rating for r in reviews) / len(reviews)
+        return 0
+
+    def get_review_count(self, obj):
+        return obj.reviews.count()
+
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+
+
+class ListingListSerializer(serializers.ModelSerializer):
+    """Lighter serializer for listing page (without full reviews)"""
+    average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Listing
+        fields = ['id', 'title', 'author', 'description', 'genre', 'language', 'pages', 'price', 
+                  'condition', 'seller_id', 'seller_name', 'status', 'image', 'image_url', 'average_rating', 
+                  'review_count', 'created_at']
+
+    def get_average_rating(self, obj):
+        reviews = obj.reviews.all()
+        if reviews:
+            return sum(r.rating for r in reviews) / len(reviews)
+        return 0
+
+    def get_review_count(self, obj):
+        return obj.reviews.count()
+
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
+
 
 class PayoutSerializer(serializers.ModelSerializer):
     class Meta:

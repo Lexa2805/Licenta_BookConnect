@@ -16,6 +16,7 @@ export default function Navigation() {
         { href: "/marketplace", label: "Marketplace" },
         { href: "/studio", label: "Studio" },
         { href: "/community", label: "Community" },
+        { href: "/profile", label: "My Profile" },
     ];
 
     const handleSignOut = () => {

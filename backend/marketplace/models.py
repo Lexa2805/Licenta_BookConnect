@@ -16,18 +16,59 @@ class Listing(models.Model):
         ('POOR', 'Poor'),
     ]
 
+    GENRE_CHOICES = [
+        ('FANTASY', 'Fantasy'),
+        ('SCIENCE_FICTION', 'Science Fiction'),
+        ('ROMANCE', 'Romance'),
+        ('THRILLER', 'Thriller'),
+        ('MYSTERY', 'Mystery'),
+        ('SELF_HELP', 'Self-Help'),
+        ('BUSINESS', 'Business'),
+        ('PROGRAMMING', 'Programming'),
+        ('CLASSIC', 'Classic'),
+        ('OTHER', 'Other'),
+    ]
+
+    LANGUAGE_CHOICES = [
+        ('RO', 'Română'),
+        ('EN', 'English'),
+        ('FR', 'Français'),
+        ('DE', 'Deutsch'),
+        ('ES', 'Español'),
+        ('IT', 'Italiano'),
+        ('OTHER', 'Other'),
+    ]
+
     title = models.CharField(max_length=255)
+    author = models.CharField(max_length=255, default='Unknown Author')
     description = models.TextField()
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    genre = models.CharField(max_length=50, choices=GENRE_CHOICES, default='OTHER')
+    language = models.CharField(max_length=20, choices=LANGUAGE_CHOICES, default='RO')
+    pages = models.PositiveIntegerField(default=0, help_text='Number of pages')
+    price = models.DecimalField(max_digits=10, decimal_places=2)  # Price in Lei (RON)
     condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, default='GOOD')
     seller_id = models.CharField(max_length=255)  # ID from NextAuth/MongoDB
+    seller_name = models.CharField(max_length=255, default='Anonymous Seller')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='LISTED')
-    image = models.ImageField(upload_to='listings/', blank=True, null=True)
+    image = models.ImageField(upload_to='listings/', blank=True, null=True)  # Uploaded image
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.title} - {self.status}"
+        return f"{self.title} by {self.author} - {self.status}"
+
+
+class Review(models.Model):
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='reviews')
+    user_id = models.CharField(max_length=255)
+    user_name = models.CharField(max_length=255, default='Anonymous')
+    rating = models.IntegerField(default=5)  # 1-5 stars
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Review by {self.user_name} for {self.listing.title}"
+
 
 class Payout(models.Model):
     STATUS_CHOICES = [
