@@ -31,10 +31,16 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_image_url(self, obj):
         if obj.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
+            try:
+                # For ImageField - get the URL
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.image.url)
+                return obj.image.url
+            except (ValueError, AttributeError):
+                # If image is a string (legacy data), return None
+                # Frontend will use fallback
+                return None
         return None
 
 
@@ -61,10 +67,16 @@ class ListingListSerializer(serializers.ModelSerializer):
 
     def get_image_url(self, obj):
         if obj.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
+            try:
+                # For ImageField - get the URL
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.image.url)
+                return obj.image.url
+            except (ValueError, AttributeError):
+                # If image is a string (legacy data), return None
+                # Frontend will use fallback
+                return None
         return None
 
 

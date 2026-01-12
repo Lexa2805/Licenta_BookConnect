@@ -136,17 +136,20 @@ export default function MarketplacePage() {
                         >
                             <article className="bg-white dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col">
                                 {/* Book Image */}
-                                <div className="relative aspect-[3/4] overflow-hidden bg-amber-100 dark:bg-amber-800/30">
+                                <div className="relative aspect-[3/4] overflow-hidden bg-amber-100 dark:bg-amber-800/30 flex items-center justify-center">
                                     {getImageSrc(listing) ? (
                                         <img
                                             src={getImageSrc(listing)!}
                                             alt={listing.title}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = 'none';
+                                                target.parentElement!.innerHTML = '<span class="text-6xl">📚</span>';
+                                            }}
                                         />
                                     ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                            <span className="text-6xl">📚</span>
-                                        </div>
+                                        <span className="text-6xl">📚</span>
                                     )}
                                     {/* Genre Badge */}
                                     <span className="absolute top-2 left-2 text-xs font-semibold px-2 py-1 rounded-full bg-amber-700/90 text-white">

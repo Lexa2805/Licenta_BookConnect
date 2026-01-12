@@ -108,7 +108,7 @@ export default function BookDetailPage() {
             await marketplaceService.createReview({
                 listing: id,
                 user_id: session.user.id || 'anonymous',
-                user_name: session.user.username || session.user.name || 'Anonymous',
+                user_name: session.user.username || 'Anonymous',
                 rating: reviewRating,
                 comment: reviewComment,
             });
@@ -174,17 +174,20 @@ export default function BookDetailPage() {
                 {/* Book Image */}
                 <div className="relative">
                     <div className="sticky top-24">
-                        <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-amber-100 dark:bg-amber-800/30 shadow-xl">
+                        <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-amber-100 dark:bg-amber-800/30 shadow-xl flex items-center justify-center">
                             {getImageSrc() ? (
                                 <img
                                     src={getImageSrc()!}
                                     alt={listing.title}
                                     className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        target.parentElement!.innerHTML = '<span class="text-8xl">📚</span>';
+                                    }}
                                 />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <span className="text-8xl">📚</span>
-                                </div>
+                                <span className="text-8xl">📚</span>
                             )}
                         </div>
                     </div>
@@ -307,9 +310,28 @@ export default function BookDetailPage() {
                                 </p>
                             </div>
                         </div>
-                        <button className="mt-4 w-full py-2 border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-800/30 transition">
-                            Contact Seller
-                        </button>
+                        {session?.user && listing.seller_id !== session.user.id ? (
+                            <Link
+                                href={`/community/dm/${listing.seller_id}?name=${encodeURIComponent(listing.seller_name)}&book=${encodeURIComponent(listing.title)}`}
+                                className="mt-4 w-full py-2 border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-800/30 transition flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                                Contact Seller
+                            </Link>
+                        ) : session?.user && listing.seller_id === session.user.id ? (
+                            <p className="mt-4 text-center text-amber-600 dark:text-amber-400 text-sm">
+                                This is your listing
+                            </p>
+                        ) : (
+                            <Link
+                                href="/login"
+                                className="mt-4 w-full py-2 border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-300 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-800/30 transition flex items-center justify-center gap-2"
+                            >
+                                Log in to Contact Seller
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>

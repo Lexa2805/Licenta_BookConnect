@@ -96,14 +96,14 @@ export default function ProfilePage() {
                     {/* Avatar */}
                     <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg">
                         <span className="text-4xl text-white">
-                            {(session.user.username || session.user.name || 'U')[0].toUpperCase()}
+                            {(session.user.username || 'U')[0].toUpperCase()}
                         </span>
                     </div>
 
                     {/* User Info */}
                     <div className="flex-1 text-center md:text-left">
                         <h1 className="text-3xl font-bold text-amber-900 dark:text-amber-100">
-                            {session.user.username || session.user.name || 'User'}
+                            {session.user.username || 'User'}
                         </h1>
                         <p className="text-amber-700 dark:text-amber-300 mt-1">
                             {session.user.email}
@@ -142,8 +142,8 @@ export default function ProfilePage() {
                 <button
                     onClick={() => setActiveTab('listings')}
                     className={`pb-3 px-4 font-medium transition ${activeTab === 'listings'
-                            ? 'text-amber-900 dark:text-amber-100 border-b-2 border-amber-600 dark:border-amber-400'
-                            : 'text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200'
+                        ? 'text-amber-900 dark:text-amber-100 border-b-2 border-amber-600 dark:border-amber-400'
+                        : 'text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200'
                         }`}
                 >
                     My Listings ({myListings.length})
@@ -174,24 +174,27 @@ export default function ProfilePage() {
                                     className="bg-white dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition"
                                 >
                                     {/* Image */}
-                                    <div className="relative aspect-[3/4] bg-amber-100 dark:bg-amber-800/30">
+                                    <div className="relative aspect-[3/4] bg-amber-100 dark:bg-amber-800/30 flex items-center justify-center">
                                         {getImageSrc(listing) ? (
                                             <img
                                                 src={getImageSrc(listing)!}
                                                 alt={listing.title}
                                                 className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                    target.parentElement!.innerHTML = '<span class="text-6xl">📚</span>';
+                                                }}
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <span className="text-6xl">📚</span>
-                                            </div>
+                                            <span className="text-6xl">📚</span>
                                         )}
                                         {/* Status Badge */}
                                         <span className={`absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded-full ${listing.status === 'LISTED'
-                                                ? 'bg-green-500 text-white'
-                                                : listing.status === 'SOLD'
-                                                    ? 'bg-blue-500 text-white'
-                                                    : 'bg-gray-500 text-white'
+                                            ? 'bg-green-500 text-white'
+                                            : listing.status === 'SOLD'
+                                                ? 'bg-blue-500 text-white'
+                                                : 'bg-gray-500 text-white'
                                             }`}>
                                             {listing.status}
                                         </span>

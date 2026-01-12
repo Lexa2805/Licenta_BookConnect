@@ -87,7 +87,7 @@ export default function CreateListingPage() {
         data.append("price", formData.price);
         data.append("condition", formData.condition);
         data.append("seller_id", session?.user?.id || "anonymous");
-        data.append("seller_name", session?.user?.username || session?.user?.name || "Anonymous Seller");
+        data.append("seller_name", session?.user?.username || "Anonymous Seller");
 
         if (imageFile) {
             data.append("image", imageFile);

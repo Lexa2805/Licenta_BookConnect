@@ -70,11 +70,8 @@ export const marketplaceService = {
     },
 
     createListing: async (data: FormData) => {
-        const response = await api.post("/api/marketplace/listings/", data, {
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
-        });
+        // Don't set Content-Type manually - axios will set it correctly with boundary for FormData
+        const response = await api.post("/api/marketplace/listings/", data);
         return response.data;
     },
 

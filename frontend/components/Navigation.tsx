@@ -68,6 +68,20 @@ export default function Navigation() {
                             </Link>
                         ))}
 
+                        {/* Messages Button */}
+                        <Link
+                            href="/messages"
+                            className={`p-2 rounded-full transition relative ${pathname === '/messages' || pathname.startsWith('/community/dm')
+                                ? 'bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100'
+                                : 'text-amber-900 dark:text-amber-100 hover:bg-amber-50 dark:hover:bg-amber-800/30'
+                                }`}
+                            aria-label="Messages"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                        </Link>
+
                         {/* Theme Toggle Button */}
                         <button
                             onClick={toggleTheme}
@@ -133,6 +147,21 @@ export default function Navigation() {
                                 {link.label}
                             </Link>
                         ))}
+
+                        {/* Mobile Messages */}
+                        <Link
+                            href="/messages"
+                            className={`w-full text-left px-4 py-3 rounded-lg text-base font-medium transition mb-1 flex items-center gap-2 ${pathname === '/messages' || pathname.startsWith('/community/dm')
+                                ? 'bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100'
+                                : 'text-gray-600 dark:text-orange-300 hover:bg-amber-50 dark:hover:bg-amber-800/30 hover:text-amber-800 dark:hover:text-amber-100'
+                                }`}
+                            onClick={() => setIsOpen(false)}
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            Messages
+                        </Link>
 
                         {/* Mobile Theme Toggle */}
                         <button
