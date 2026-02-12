@@ -176,8 +176,8 @@ export default function DirectMessagePage() {
                                             key={conv.participant_id}
                                             href={`/community/dm/${conv.participant_id}?name=${encodeURIComponent(conv.participant_name)}`}
                                             className={`flex items-center gap-3 p-3 hover:bg-amber-50 dark:hover:bg-amber-800/30 transition ${conv.participant_id === sellerId
-                                                    ? 'bg-amber-100 dark:bg-amber-800/40'
-                                                    : ''
+                                                ? 'bg-amber-100 dark:bg-amber-800/40'
+                                                : ''
                                                 }`}
                                         >
                                             {/* Avatar */}
@@ -215,7 +215,7 @@ export default function DirectMessagePage() {
                     <div className="bg-white dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-t-xl p-4 shadow-sm">
                         <div className="flex items-center gap-4">
                             <Link
-                                href="/messages"
+                                href="/community"
                                 className="text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300"
                             >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

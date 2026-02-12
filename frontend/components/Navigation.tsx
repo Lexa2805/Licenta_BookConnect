@@ -4,20 +4,28 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useTheme } from "@/app/theme-provider";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 export default function Navigation() {
     const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
     const { theme, toggleTheme } = useTheme();
+    const { data: session, status } = useSession();
+    const isAuthenticated = status === "authenticated";
 
-    const navLinks = [
+    // Base nav links (always visible)
+    const baseNavLinks = [
         { href: "/", label: "Home" },
+        { href: "/library", label: "Library" },
         { href: "/marketplace", label: "Marketplace" },
         { href: "/studio", label: "Studio" },
         { href: "/community", label: "Community" },
-        { href: "/profile", label: "My Profile" },
     ];
+
+    // Add My Profile only if authenticated
+    const navLinks = isAuthenticated
+        ? [...baseNavLinks, { href: "/profile", label: "My Profile" }]
+        : baseNavLinks;
 
     const handleSignOut = () => {
         signOut({ callbackUrl: "/login" });
@@ -55,32 +63,22 @@ export default function Navigation() {
 
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center space-x-8">
-                        {navLinks.map((link) => (
-                            <Link
-                                key={link.href}
-                                href={link.href}
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition ${pathname === link.href
-                                    ? "bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100"
-                                    : "text-gray-600 dark:text-orange-300 hover:bg-amber-50 dark:hover:bg-amber-800/30 hover:text-amber-800 dark:hover:text-amber-100"
-                                    }`}
-                            >
-                                {link.label}
-                            </Link>
-                        ))}
-
-                        {/* Messages Button */}
-                        <Link
-                            href="/messages"
-                            className={`p-2 rounded-full transition relative ${pathname === '/messages' || pathname.startsWith('/community/dm')
-                                ? 'bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100'
-                                : 'text-amber-900 dark:text-amber-100 hover:bg-amber-50 dark:hover:bg-amber-800/30'
-                                }`}
-                            aria-label="Messages"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                        </Link>
+                        {navLinks.map((link) => {
+                            const isActive = pathname === link.href ||
+                                (link.href === '/community' && pathname.startsWith('/community'));
+                            return (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    className={`px-4 py-2 rounded-full text-sm font-medium transition ${isActive
+                                        ? "bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100"
+                                        : "text-gray-600 dark:text-orange-300 hover:bg-amber-50 dark:hover:bg-amber-800/30 hover:text-amber-800 dark:hover:text-amber-100"
+                                        }`}
+                                >
+                                    {link.label}
+                                </Link>
+                            );
+                        })}
 
                         {/* Theme Toggle Button */}
                         <button
@@ -99,13 +97,22 @@ export default function Navigation() {
                             )}
                         </button>
 
-                        {/* Sign Out Button */}
-                        <button
-                            onClick={handleSignOut}
-                            className="px-4 py-2 rounded-full text-sm font-medium text-red-600 hover:bg-red-50 transition"
-                        >
-                            Sign Out
-                        </button>
+                        {/* Auth Buttons */}
+                        {isAuthenticated ? (
+                            <button
+                                onClick={handleSignOut}
+                                className="px-4 py-2 rounded-full text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                            >
+                                Sign Out
+                            </button>
+                        ) : (
+                            <Link
+                                href="/login"
+                                className="px-4 py-2 rounded-full text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 transition"
+                            >
+                                Login
+                            </Link>
+                        )}
                     </div>
 
                     {/* Mobile menu button */}
@@ -134,34 +141,23 @@ export default function Navigation() {
                 {/* Mobile Navigation */}
                 {isOpen && (
                     <div className="md:hidden pb-4 bg-white/90 dark:bg-amber-900/90 backdrop-blur-md rounded-b-xl shadow-lg absolute left-0 right-0 px-4 border-b border-amber-200 dark:border-amber-700/50">
-                        {navLinks.map((link) => (
-                            <Link
-                                key={link.href}
-                                href={link.href}
-                                className={`block px-4 py-3 rounded-lg text-base font-medium transition mb-1 ${pathname === link.href
-                                    ? "bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100"
-                                    : "text-gray-600 dark:text-orange-300 hover:bg-amber-50 dark:hover:bg-amber-800/30 hover:text-amber-800 dark:hover:text-amber-100"
-                                    }`}
-                                onClick={() => setIsOpen(false)}
-                            >
-                                {link.label}
-                            </Link>
-                        ))}
-
-                        {/* Mobile Messages */}
-                        <Link
-                            href="/messages"
-                            className={`w-full text-left px-4 py-3 rounded-lg text-base font-medium transition mb-1 flex items-center gap-2 ${pathname === '/messages' || pathname.startsWith('/community/dm')
-                                ? 'bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100'
-                                : 'text-gray-600 dark:text-orange-300 hover:bg-amber-50 dark:hover:bg-amber-800/30 hover:text-amber-800 dark:hover:text-amber-100'
-                                }`}
-                            onClick={() => setIsOpen(false)}
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                            Messages
-                        </Link>
+                        {navLinks.map((link) => {
+                            const isActive = pathname === link.href ||
+                                (link.href === '/community' && pathname.startsWith('/community'));
+                            return (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    className={`block px-4 py-3 rounded-lg text-base font-medium transition mb-1 ${isActive
+                                        ? "bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100"
+                                        : "text-gray-600 dark:text-orange-300 hover:bg-amber-50 dark:hover:bg-amber-800/30 hover:text-amber-800 dark:hover:text-amber-100"
+                                        }`}
+                                    onClick={() => setIsOpen(false)}
+                                >
+                                    {link.label}
+                                </Link>
+                            );
+                        })}
 
                         {/* Mobile Theme Toggle */}
                         <button
@@ -185,16 +181,29 @@ export default function Navigation() {
                             )}
                         </button>
 
-                        {/* Mobile Sign Out */}
-                        <button
-                            onClick={handleSignOut}
-                            className="w-full text-left px-4 py-3 rounded-lg text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition flex items-center gap-2"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                            Sign Out
-                        </button>
+                        {/* Mobile Auth Button */}
+                        {isAuthenticated ? (
+                            <button
+                                onClick={handleSignOut}
+                                className="w-full text-left px-4 py-3 rounded-lg text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition flex items-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                                Sign Out
+                            </button>
+                        ) : (
+                            <Link
+                                href="/login"
+                                className="w-full text-left px-4 py-3 rounded-lg text-base font-medium bg-amber-600 text-white hover:bg-amber-700 transition flex items-center gap-2"
+                                onClick={() => setIsOpen(false)}
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                                </svg>
+                                Login
+                            </Link>
+                        )}
                     </div>
                 )}
             </div>

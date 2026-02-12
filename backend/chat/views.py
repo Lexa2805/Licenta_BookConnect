@@ -9,6 +9,47 @@ class ChatGroupViewSet(viewsets.ModelViewSet):
     queryset = ChatGroup.objects.all()
     serializer_class = ChatGroupSerializer
 
+    def get_queryset(self):
+        queryset = ChatGroup.objects.annotate(
+            member_count=Count('members')
+        ).order_by('-created_at')
+        return queryset
+
+    def perform_create(self, serializer):
+        # Save the group with created_by
+        created_by = self.request.data.get('created_by', '')
+        group = serializer.save(created_by=created_by)
+        # Auto-join creator to the group
+        if created_by:
+            GroupMember.objects.get_or_create(group=group, user_id=created_by)
+
+    @action(detail=False, methods=['get'])
+    def my_groups(self, request):
+        """Get groups the user is a member of"""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        groups = ChatGroup.objects.filter(
+            members__user_id=user_id
+        ).annotate(
+            member_count=Count('members')
+        ).order_by('-created_at')
+        
+        # Get last message for each group
+        result = []
+        for group in groups:
+            last_msg = Message.objects.filter(group=group).order_by('-timestamp').first()
+            group_data = ChatGroupSerializer(group).data
+            group_data['member_count'] = group.member_count
+            group_data['is_member'] = True
+            if last_msg:
+                group_data['last_message'] = last_msg.content[:50] + ('...' if len(last_msg.content) > 50 else '')
+                group_data['last_message_time'] = last_msg.timestamp.isoformat()
+            result.append(group_data)
+        
+        return Response(result)
+
     @action(detail=True, methods=['post'])
     def join(self, request, pk=None):
         group = self.get_object()
@@ -20,6 +61,25 @@ class ChatGroupViewSet(viewsets.ModelViewSet):
         if created:
             return Response({'status': 'joined group'})
         return Response({'status': 'already a member'})
+
+    @action(detail=True, methods=['post'])
+    def leave(self, request, pk=None):
+        group = self.get_object()
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        deleted, _ = GroupMember.objects.filter(group=group, user_id=user_id).delete()
+        if deleted:
+            return Response({'status': 'left group'})
+        return Response({'status': 'not a member'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def members(self, request, pk=None):
+        group = self.get_object()
+        members = GroupMember.objects.filter(group=group).order_by('joined_at')
+        serializer = GroupMemberSerializer(members, many=True)
+        return Response(serializer.data)
 
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()

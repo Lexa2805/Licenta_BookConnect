@@ -6,7 +6,7 @@ export default function RegisterPage() {
   const [username, setU] = useState("");
   const [email, setE] = useState("");
   const [password, setP] = useState("");
-  const [role, setR] = useState<"reader" | "author" | "admin">("reader");
+  const [role, setR] = useState<"reader" | "author">("reader");
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -124,7 +124,6 @@ export default function RegisterPage() {
               >
                 <option value="reader" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-white">📚 Reader - Discover and read books</option>
                 <option value="author" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-white">✍️ Author - Write and publish</option>
-                <option value="admin" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-white">👑 Admin - Manage platform</option>
               </select>
             </div>
 

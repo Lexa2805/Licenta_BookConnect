@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "marketplace.apps.MarketplaceConfig",
     "manuscripts.apps.ManuscriptsConfig",
     "chat.apps.ChatConfig",
+    "library.apps.LibraryConfig",
     "drf_spectacular",
     "drf_spectacular_sidecar",
     "corsheaders",
@@ -78,6 +79,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "Licenta_BookConnect.middleware.XFrameOptionsExemptMiddleware",  # Must be after XFrameOptionsMiddleware
 ]
 TEMPLATES = [
     {

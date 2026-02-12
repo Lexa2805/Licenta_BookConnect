@@ -22,6 +22,7 @@ urlpatterns = [
     path("api/marketplace/", include("marketplace.urls")),
     path("api/manuscripts/", include("manuscripts.urls")),
     path("api/chat/", include("chat.urls")),
+    path("api/library/", include("library.urls")),
 ]
 
 from django.conf import settings

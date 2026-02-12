@@ -19,13 +19,54 @@ export interface Conversation {
     unread_count: number;
 }
 
+export interface ChatGroup {
+    id: number;
+    name: string;
+    description: string;
+    created_at: string;
+    created_by?: string;
+    member_count?: number;
+    is_member?: boolean;
+    last_message?: string;
+    last_message_time?: string;
+}
+
 export const chatService = {
-    getGroups: async () => {
+    // Group Management
+    getGroups: async (): Promise<ChatGroup[]> => {
         const response = await api.get("/api/chat/groups/");
         return response.data;
     },
+
+    getMyGroups: async (userId: string): Promise<ChatGroup[]> => {
+        const response = await api.get("/api/chat/groups/my_groups/", {
+            params: { user_id: userId }
+        });
+        return response.data;
+    },
+
+    getGroup: async (groupId: number): Promise<ChatGroup> => {
+        const response = await api.get(`/api/chat/groups/${groupId}/`);
+        return response.data;
+    },
+
+    createGroup: async (data: { name: string; description: string; created_by: string }): Promise<ChatGroup> => {
+        const response = await api.post("/api/chat/groups/", data);
+        return response.data;
+    },
+
     joinGroup: async (groupId: number, userId: string) => {
         const response = await api.post(`/api/chat/groups/${groupId}/join/`, { user_id: userId });
+        return response.data;
+    },
+
+    leaveGroup: async (groupId: number, userId: string) => {
+        const response = await api.post(`/api/chat/groups/${groupId}/leave/`, { user_id: userId });
+        return response.data;
+    },
+
+    getGroupMembers: async (groupId: number) => {
+        const response = await api.get(`/api/chat/groups/${groupId}/members/`);
         return response.data;
     },
     getMessages: async (groupId?: number, receiverId?: string, senderId?: string) => {
