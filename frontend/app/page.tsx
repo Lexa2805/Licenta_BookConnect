@@ -1,16 +1,16 @@
 "use client";
-"use client";
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import Link from "next/link";
 
 interface Book {
-    id: number;
+    id: string;
     title: string;
-    author: string;
-    genre: string;
+    authors: string[];
+    genres: string[];
     description: string;
+    cover_url: string | null;
 }
 
 export default function Home() {
@@ -18,9 +18,9 @@ export default function Home() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get("/api/books/")
+        api.get("/api/home-data/")
             .then((res) => {
-                setBooks(res.data.slice(0, 6)); // Show first 6 books
+                setBooks(res.data.latest?.slice(0, 6) || []); // Show first 6 books
                 setLoading(false);
             })
             .catch((err) => {
@@ -94,14 +94,18 @@ export default function Home() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                         {books.map((book) => (
                             <div key={book.id} className="bg-white dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-                                <div className="h-48 bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/50 dark:to-orange-900/50 flex items-center justify-center">
-                                    <span className="text-6xl">📖</span>
+                                <div className="h-48 bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/50 dark:to-orange-900/50 flex items-center justify-center overflow-hidden">
+                                    {book.cover_url ? (
+                                        <img src={book.cover_url} alt={book.title} className="h-full w-full object-cover" />
+                                    ) : (
+                                        <span className="text-6xl">📖</span>
+                                    )}
                                 </div>
                                 <div className="p-4">
                                     <h3 className="font-semibold text-lg mb-1 line-clamp-1 text-amber-900 dark:text-amber-100">{book.title}</h3>
-                                    <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">{book.author}</p>
+                                    <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">{book.authors?.join(", ") || "Unknown Author"}</p>
                                     <span className="text-xs bg-amber-100 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200 px-2 py-1 rounded-full">
-                                        {book.genre}
+                                        {book.genres?.[0] || "Unknown"}
                                     </span>
                                 </div>
                             </div>
