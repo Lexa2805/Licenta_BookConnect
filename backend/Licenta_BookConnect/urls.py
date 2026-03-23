@@ -7,6 +7,11 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 
+# Customize the Django admin site
+admin.site.site_header = "BookConnect Administration"
+admin.site.site_title = "BookConnect Admin"
+admin.site.index_title = "Site Management"
+
 router = DefaultRouter()
 
 urlpatterns = [
@@ -23,6 +28,9 @@ urlpatterns = [
     path("api/manuscripts/", include("manuscripts.urls")),
     path("api/chat/", include("chat.urls")),
     path("api/library/", include("library.urls")),
+
+    # Template-based book management UI
+    path("manage/books/", include("library.manage_urls")),
 ]
 
 from django.conf import settings

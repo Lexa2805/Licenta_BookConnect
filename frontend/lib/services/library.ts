@@ -97,9 +97,7 @@ export const libraryService = {
         if (data.cover_url) formData.append('cover_url', data.cover_url);
         if (data.pdf_url) formData.append('pdf_url', data.pdf_url);
 
-        const response = await api.post('/api/library/books/', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        const response = await api.post('/api/library/books/', formData);
         return response.data as LibraryBook;
     },
 
@@ -117,9 +115,7 @@ export const libraryService = {
         if (data.cover_image) formData.append('cover_image', data.cover_image);
         if (data.pdf_file) formData.append('pdf_file', data.pdf_file);
 
-        const response = await api.patch(`/api/library/books/${id}/`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        const response = await api.patch(`/api/library/books/${id}/`, formData);
         return response.data as LibraryBook;
     },
 

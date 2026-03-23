@@ -3,11 +3,80 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+from django.views.decorators.http import require_POST
 from .models import LibraryBook, UserLibrary, Bookmark, ReadingSession
 from .serializers import (
-    LibraryBookSerializer, UserLibrarySerializer, 
+    LibraryBookSerializer, UserLibrarySerializer,
     BookmarkSerializer, ReadingSessionSerializer
 )
+from .forms import LibraryBookForm
+
+
+# ---------------------------------------------------------------------------
+# Template-based Book Management Views
+# ---------------------------------------------------------------------------
+
+def book_manage_list(request):
+    """List all books with search; accessible at /manage/books/"""
+    search = request.GET.get("q", "").strip()
+    books = LibraryBook.objects.all()
+    if search:
+        books = books.filter(
+            Q(title__icontains=search) | Q(author__icontains=search)
+        )
+    return render(request, "library/manage_list.html", {
+        "books": books,
+        "search": search,
+        "total": LibraryBook.objects.count(),
+    })
+
+
+def book_manage_create(request):
+    """Create a new book."""
+    if request.method == "POST":
+        form = LibraryBookForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Book added successfully!")
+            return redirect("book-manage-list")
+    else:
+        form = LibraryBookForm()
+    return render(request, "library/manage_form.html", {
+        "form": form,
+        "action": "Add New Book",
+        "submit_label": "Add Book",
+    })
+
+
+def book_manage_edit(request, pk):
+    """Edit an existing book."""
+    book = get_object_or_404(LibraryBook, pk=pk)
+    if request.method == "POST":
+        form = LibraryBookForm(request.POST, request.FILES, instance=book)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'"{book.title}" updated successfully!')
+            return redirect("book-manage-list")
+    else:
+        form = LibraryBookForm(instance=book)
+    return render(request, "library/manage_form.html", {
+        "form": form,
+        "book": book,
+        "action": f"Edit: {book.title}",
+        "submit_label": "Save Changes",
+    })
+
+
+@require_POST
+def book_manage_delete(request, pk):
+    """Delete a book (POST only)."""
+    book = get_object_or_404(LibraryBook, pk=pk)
+    title = book.title
+    book.delete()
+    messages.success(request, f'"{title}" has been deleted.')
+    return redirect("book-manage-list")
 
 
 class LibraryBookViewSet(viewsets.ModelViewSet):

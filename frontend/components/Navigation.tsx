@@ -9,9 +9,14 @@ import { signOut, useSession } from "next-auth/react";
 export default function Navigation() {
     const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
+
+    if (pathname.startsWith('/admin')) return null;
     const { theme, toggleTheme } = useTheme();
     const { data: session, status } = useSession();
     const isAuthenticated = status === "authenticated";
+    const isAdmin = session?.user?.role === "admin";
+
+    const DJANGO_ADMIN_URL = process.env.NEXT_PUBLIC_DJANGO_ADMIN_URL || "http://localhost:8000/admin/";
 
     // Base nav links (always visible)
     const baseNavLinks = [
@@ -79,6 +84,29 @@ export default function Navigation() {
                                 </Link>
                             );
                         })}
+
+                        {/* Admin Panel link (only for admin users) */}
+                        {isAdmin && (
+                            <>
+                                <Link
+                                    href="/library/manage"
+                                    className={`px-4 py-2 rounded-full text-sm font-medium transition ${pathname.startsWith('/library/manage')
+                                        ? "bg-amber-100 dark:bg-amber-800/40 text-amber-900 dark:text-amber-100"
+                                        : "text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-800/30 border border-amber-300 dark:border-amber-600"
+                                        }`}
+                                >
+                                    📚 Manage Books
+                                </Link>
+                                <a
+                                    href={DJANGO_ADMIN_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-4 py-2 rounded-full text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition border border-purple-300 dark:border-purple-600"
+                                >
+                                    ⚙️ Admin Panel
+                                </a>
+                            </>
+                        )}
 
                         {/* Theme Toggle Button */}
                         <button
@@ -158,6 +186,19 @@ export default function Navigation() {
                                 </Link>
                             );
                         })}
+
+                        {/* Mobile Admin Panel link (only for admin users) */}
+                        {isAdmin && (
+                            <a
+                                href={DJANGO_ADMIN_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block px-4 py-3 rounded-lg text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition mb-1"
+                                onClick={() => setIsOpen(false)}
+                            >
+                                ⚙️ Admin Panel
+                            </a>
+                        )}
 
                         {/* Mobile Theme Toggle */}
                         <button

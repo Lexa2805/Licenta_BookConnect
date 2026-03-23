@@ -1,3 +1,4 @@
 from django.contrib import admin
 
-# Register your models here.
+# Reviews are stored in MongoDB (see models_mongo.py).
+# SQLite-based review models are not used in this project.
