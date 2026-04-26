@@ -42,8 +42,12 @@ export default function LibraryPage() {
         setLoading(true);
         try {
             if (activeTab === 'browse' || activeTab === 'admin') {
-                const data = await libraryService.getBooks({ search: searchQuery || undefined });
+                const [data, libData] = await Promise.all([
+                    libraryService.getBooks({ search: searchQuery || undefined }),
+                    userId ? libraryService.getUserLibrary(userId) : Promise.resolve([])
+                ]);
                 setBooks(data);
+                if (userId) setUserLibrary(libData);
             } else if (activeTab === 'my-library') {
                 if (userId) {
                     const data = await libraryService.getUserLibrary(userId, {
@@ -88,13 +92,36 @@ export default function LibraryPage() {
         }
     };
 
-    const handleRemoveFromLibrary = async (entryId: number) => {
-        if (!confirm('Remove this book from your library?')) return;
+    const handleFavoriteFromBrowse = async (bookId: number) => {
         try {
-            await libraryService.removeFromLibrary(entryId);
+            let entry = userLibrary.find(e => e.book.id === bookId);
+            if (!entry) {
+                entry = await libraryService.addToLibrary(userId, bookId);
+            }
+            await libraryService.toggleFavorite(entry.id);
             loadData();
         } catch (error) {
-            console.error('Error removing from library:', error);
+            console.error('Error toggling favorite from browse:', error);
+        }
+    };
+
+    const handleRemoveFromLibrary = async (entryId: number) => {
+        // Optimistically update the UI to feel instant
+        setUserLibrary(prev => prev.filter(entry => entry.id !== entryId));
+        
+        try {
+            if (activeTab === 'favorites') {
+                // Just remove from favorites, don't delete from library entirely
+                await libraryService.toggleFavorite(entryId);
+            } else {
+                // Delete the entire library entry
+                await libraryService.removeFromLibrary(entryId);
+            }
+            loadData();
+        } catch (error: any) {
+            console.error('Error removing from library/favorites:', error);
+            alert('Failed to remove: ' + error?.message);
+            loadData();
         }
     };
 
@@ -337,9 +364,20 @@ export default function LibraryPage() {
                                         )}
                                     </div>
                                     <div className="p-4">
-                                        <h3 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-2 mb-1">
-                                            {book.title}
-                                        </h3>
+                                        <div className="flex items-start justify-between mb-1 gap-2">
+                                            <h3 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-2">
+                                                {book.title}
+                                            </h3>
+                                            {userId && (
+                                                <button
+                                                    onClick={() => handleFavoriteFromBrowse(book.id)}
+                                                    className="text-xl flex-shrink-0"
+                                                    title={userLibrary.find(e => e.book.id === book.id)?.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                                                >
+                                                    {userLibrary.find(e => e.book.id === book.id)?.is_favorite ? '❤️' : '🤍'}
+                                                </button>
+                                            )}
+                                        </div>
                                         <p className="text-amber-600 dark:text-amber-400 text-sm mb-2">
                                             {book.author}
                                         </p>
@@ -419,38 +457,42 @@ export default function LibraryPage() {
                                             <p className="text-amber-600 dark:text-amber-400 text-sm mb-2">
                                                 {entry.book.author}
                                             </p>
-                                            <div className="mb-3">
-                                                {getStatusBadge(entry.status)}
-                                            </div>
+                                            {activeTab !== 'favorites' && (
+                                                <>
+                                                    <div className="mb-3">
+                                                        {getStatusBadge(entry.status)}
+                                                    </div>
 
-                                            {/* Progress Bar */}
-                                            {entry.book.pages > 0 && (
-                                                <div className="mb-3">
-                                                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-                                                        <span>Page {entry.current_page} of {entry.book.pages}</span>
-                                                        <span>{Math.round((entry.current_page / entry.book.pages) * 100)}%</span>
+                                                    {/* Progress Bar */}
+                                                    {entry.book.pages > 0 && (
+                                                        <div className="mb-3">
+                                                            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                                <span>Page {entry.current_page} of {entry.book.pages}</span>
+                                                                <span>{Math.round((entry.current_page / entry.book.pages) * 100)}%</span>
+                                                            </div>
+                                                            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="h-full bg-amber-500 transition-all"
+                                                                    style={{ width: `${(entry.current_page / entry.book.pages) * 100}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Rating */}
+                                                    <div className="flex items-center gap-1 mb-3">
+                                                        {[1, 2, 3, 4, 5].map((star) => (
+                                                            <button
+                                                                key={star}
+                                                                onClick={() => handleRateBook(entry.id, star)}
+                                                                className="text-lg"
+                                                            >
+                                                                {star <= (entry.rating || 0) ? '⭐' : '☆'}
+                                                            </button>
+                                                        ))}
                                                     </div>
-                                                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-amber-500 transition-all"
-                                                            style={{ width: `${(entry.current_page / entry.book.pages) * 100}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
+                                                </>
                                             )}
-
-                                            {/* Rating */}
-                                            <div className="flex items-center gap-1 mb-3">
-                                                {[1, 2, 3, 4, 5].map((star) => (
-                                                    <button
-                                                        key={star}
-                                                        onClick={() => handleRateBook(entry.id, star)}
-                                                        className="text-lg"
-                                                    >
-                                                        {star <= (entry.rating || 0) ? '⭐' : '☆'}
-                                                    </button>
-                                                ))}
-                                            </div>
 
                                             <div className="flex gap-2">
                                                 {(entry.book.pdf || entry.book.pdf_url) && (

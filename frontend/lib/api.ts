@@ -36,7 +36,12 @@ async function request<T>(
     }
   }
 
-  const res = await fetch(url, { method, headers, body: fetchBody });
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: fetchBody,
+    cache: "no-store",
+  });
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => res.statusText);

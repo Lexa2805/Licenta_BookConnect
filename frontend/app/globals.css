@@ -15,3 +15,122 @@ body {
 .btn-secondary {
     @apply bg-white/80 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700/50 text-amber-900 dark:text-amber-100 font-semibold py-2 px-4 rounded-xl hover:bg-white dark:hover:bg-amber-900/60 transition-all duration-200 shadow-sm hover:shadow-md;
 }
+
+/* ── AI Feature Animations ───────────────────────────── */
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes magic-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.4), 0 0 20px rgba(245, 158, 11, 0.1); }
+    50% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.6), 0 0 40px rgba(245, 158, 11, 0.2); }
+}
+
+@keyframes float-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes sparkle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+.ai-shimmer {
+    background: linear-gradient(90deg, transparent 25%, rgba(245, 158, 11, 0.15) 50%, transparent 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.magic-suggest-glow {
+    position: relative;
+    overflow: hidden;
+    animation: magic-pulse 2s ease-in-out infinite;
+}
+
+.magic-suggest-glow::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(135deg, #f59e0b, #ea580c, #a855f7, #f59e0b);
+    background-size: 300% 300%;
+    border-radius: inherit;
+    z-index: -1;
+    animation: shimmer 3s linear infinite;
+    opacity: 0.7;
+}
+
+.float-in {
+    animation: float-in 0.4s ease-out both;
+}
+
+.vibe-card {
+    position: relative;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+}
+
+.vibe-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0.45) 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 2rem;
+    text-align: center;
+}
+
+.vibe-card-text {
+    color: white;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.7), 0 0 40px rgba(0,0,0,0.3);
+}
+
+.vibe-card-quote {
+    font-size: 1.125rem;
+    line-height: 1.6;
+    font-style: italic;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    max-width: 85%;
+}
+
+.vibe-card-quote::before {
+    content: '\201C';
+    display: block;
+    font-size: 3.5rem;
+    line-height: 1;
+    opacity: 0.5;
+    font-style: normal;
+    margin-bottom: 0.25rem;
+    font-family: Georgia, 'Times New Roman', serif;
+}
+
+.vibe-card-caption {
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+
+.vibe-card-meta {
+    position: absolute;
+    bottom: 1rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 0.65rem;
+    opacity: 0.5;
+    letter-spacing: 0.05em;
+}
+
+.sparkle-icon {
+    display: inline-block;
+    animation: sparkle 1.5s ease-in-out infinite;
+}
