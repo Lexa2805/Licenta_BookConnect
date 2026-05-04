@@ -57,14 +57,14 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T = unknown>(url: string, options?: RequestOptions) =>
+  get: <T = any>(url: string, options?: RequestOptions) =>
     request<T>("GET", url, undefined, options),
-  post: <T = unknown>(url: string, body?: unknown, options?: RequestOptions) =>
+  post: <T = any>(url: string, body?: unknown, options?: RequestOptions) =>
     request<T>("POST", url, body, options),
-  patch: <T = unknown>(url: string, body?: unknown, options?: RequestOptions) =>
+  patch: <T = any>(url: string, body?: unknown, options?: RequestOptions) =>
     request<T>("PATCH", url, body, options),
-  put: <T = unknown>(url: string, body?: unknown, options?: RequestOptions) =>
+  put: <T = any>(url: string, body?: unknown, options?: RequestOptions) =>
     request<T>("PUT", url, body, options),
-  delete: <T = unknown>(url: string, options?: RequestOptions) =>
+  delete: <T = any>(url: string, options?: RequestOptions) =>
     request<T>("DELETE", url, undefined, options),
 };

@@ -7,6 +7,11 @@ export interface DirectMessage {
     receiver_id: string;
     receiver_name?: string;
     content: string;
+    attachment?: string | null;
+    attachment_url?: string | null;
+    attachment_name?: string;
+    attachment_type?: string;
+    attachment_size?: number | null;
     timestamp: string;
 }
 
@@ -26,9 +31,22 @@ export interface ChatGroup {
     created_at: string;
     created_by?: string;
     member_count?: number;
+    members?: Array<{ id: number; user_id: string; joined_at: string }>;
     is_member?: boolean;
     last_message?: string;
     last_message_time?: string;
+}
+
+export interface DirectMessagePayload {
+    sender_id: string;
+    sender_name?: string;
+    receiver_id: string;
+    receiver_name?: string;
+    content?: string;
+    attachment?: File | null;
+    attachment_name?: string;
+    attachment_type?: string;
+    attachment_size?: number;
 }
 
 export const chatService = {
@@ -94,17 +112,21 @@ export const chatService = {
         return response.data;
     },
 
-    sendDirectMessage: async (data: {
-        sender_id: string;
-        sender_name?: string;
-        receiver_id: string;
-        receiver_name?: string;
-        content: string;
-    }): Promise<DirectMessage> => {
-        const response = await api.post("/api/chat/messages/", {
-            ...data,
-            group: null  // null group means it's a DM
-        });
+    sendDirectMessage: async (data: DirectMessagePayload): Promise<DirectMessage> => {
+        const payload = new FormData();
+        payload.append("sender_id", data.sender_id);
+        if (data.sender_name) payload.append("sender_name", data.sender_name);
+        payload.append("receiver_id", data.receiver_id);
+        if (data.receiver_name) payload.append("receiver_name", data.receiver_name);
+        if (data.content !== undefined) payload.append("content", data.content);
+        if (data.attachment) payload.append("attachment", data.attachment);
+        if (data.attachment_name) payload.append("attachment_name", data.attachment_name);
+        if (data.attachment_type) payload.append("attachment_type", data.attachment_type);
+        if (data.attachment_size !== undefined) {
+            payload.append("attachment_size", String(data.attachment_size));
+        }
+
+        const response = await api.post("/api/chat/messages/", payload);
         return response.data;
     },
 

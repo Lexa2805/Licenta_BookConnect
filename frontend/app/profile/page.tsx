@@ -1,265 +1,206 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Edit3, MapPin, Quote, Loader2 } from "lucide-react";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Button } from "@/components/ui/Button";
+import { SectionHeader } from "@/components/ui/SectionTitle";
+import { BookCard } from "@/components/books/BookCard";
 import { useSession } from "next-auth/react";
-import { marketplaceService, Listing } from "@/lib/services/marketplace";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-
-const GENRES: { [key: string]: string } = {
-    'FANTASY': 'Fantasy',
-    'SCIENCE_FICTION': 'Science Fiction',
-    'ROMANCE': 'Romance',
-    'THRILLER': 'Thriller',
-    'MYSTERY': 'Mystery',
-    'SELF_HELP': 'Self-Help',
-    'BUSINESS': 'Business',
-    'PROGRAMMING': 'Programming',
-    'CLASSIC': 'Classic',
-    'OTHER': 'Other',
-};
-
-const LANGUAGES: { [key: string]: string } = {
-    'RO': 'Română',
-    'EN': 'English',
-    'FR': 'Français',
-    'DE': 'Deutsch',
-    'ES': 'Español',
-    'IT': 'Italiano',
-    'OTHER': 'Other',
-};
+import { useQuery } from "@tanstack/react-query";
+import { libraryService } from "@/lib/services/library";
 
 export default function ProfilePage() {
-    const { data: session, status } = useSession();
-    const router = useRouter();
-    const [myListings, setMyListings] = useState<Listing[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'listings' | 'reviews'>('listings');
+  const { data: session } = useSession();
+  
+  const username = session?.user?.username || "Guest";
+  const initials = username.substring(0, 2).toUpperCase();
 
-    useEffect(() => {
-        if (status === 'unauthenticated') {
-            router.push('/login');
-        } else if (status === 'authenticated' && session?.user?.id) {
-            loadMyListings();
-        }
-    }, [status, session]);
+  const { data: userLibrary = [], isLoading } = useQuery({
+    queryKey: ["user-library", session?.user?.id],
+    queryFn: () => libraryService.getUserLibrary(session!.user.id as string),
+    enabled: !!session?.user?.id,
+  });
 
-    const loadMyListings = async () => {
-        try {
-            const data = await marketplaceService.getMyListings(session!.user!.id!);
-            setMyListings(data);
-        } catch (err) {
-            console.error("Failed to load listings:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const readingBooks = userLibrary.filter(entry => entry.status === "READING");
+  const finishedBooks = userLibrary.filter(entry => entry.status === "FINISHED");
+  
+  const totalPagesRead = finishedBooks.reduce((sum, entry) => sum + (entry.book.pages || 0), 0) + 
+                         readingBooks.reduce((sum, entry) => sum + (entry.current_page || 0), 0);
 
-    const getImageSrc = (listing: Listing) => {
-        if (listing.image_url) return listing.image_url;
-        if (!listing.image) return null;
-        if (listing.image.startsWith('http')) return listing.image;
-        return `/books/${listing.image}`;
-    };
+  const realStats = [
+    { id: "s1", label: "Books Read", value: finishedBooks.length.toString() },
+    { id: "s2", label: "Pages", value: totalPagesRead.toLocaleString() },
+    { id: "s3", label: "Avg Rating", value: "0.0" },
+    { id: "s4", label: "Reading", value: readingBooks.length.toString() },
+  ];
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('ro-RO', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-    };
+  const getGradientForBook = (id: number) => {
+    const gradients = [
+      "linear-gradient(135deg, #1B2638, #3B4860)",
+      "linear-gradient(135deg, #7C3F22, #B26845)",
+      "linear-gradient(135deg, #1F4A3A, #3D7A60)",
+      "linear-gradient(135deg, #BA9747, #D4B679)",
+      "linear-gradient(135deg, #2D4C3B, #5A7B68)",
+      "linear-gradient(135deg, #5C3A21, #8B5A33)",
+      "linear-gradient(135deg, #4B2A3B, #7A4A5C)",
+    ];
+    return gradients[id % gradients.length];
+  };
 
-    if (status === 'loading' || loading) {
-        return (
-            <div className="container mx-auto p-4">
-                <div className="flex items-center justify-center py-20">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-700 dark:border-amber-400"></div>
-                    <span className="ml-3 text-amber-800 dark:text-amber-200 text-lg">Loading profile...</span>
-                </div>
-            </div>
-        );
-    }
-
-    if (!session?.user) {
-        return null; // Redirect will happen
-    }
-
-    const listedBooks = myListings.filter(l => l.status === 'LISTED');
-    const soldBooks = myListings.filter(l => l.status === 'SOLD');
-
-    return (
-        <div className="container mx-auto p-4 max-w-6xl">
-            {/* Profile Header */}
-            <div className="bg-white dark:bg-amber-900/30 rounded-2xl border border-amber-200 dark:border-amber-700/50 p-6 mb-8">
-                <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-                    {/* Avatar */}
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg">
-                        <span className="text-4xl text-white">
-                            {(session.user.username || 'U')[0].toUpperCase()}
-                        </span>
-                    </div>
-
-                    {/* User Info */}
-                    <div className="flex-1 text-center md:text-left">
-                        <h1 className="text-3xl font-bold text-amber-900 dark:text-amber-100">
-                            {session.user.username || 'User'}
-                        </h1>
-                        <p className="text-amber-700 dark:text-amber-300 mt-1">
-                            {session.user.email}
-                        </p>
-                        <div className="flex flex-wrap gap-4 mt-4 justify-center md:justify-start">
-                            <div className="bg-amber-100 dark:bg-amber-800/40 px-4 py-2 rounded-lg">
-                                <span className="text-2xl font-bold text-amber-900 dark:text-amber-100">
-                                    {myListings.length}
-                                </span>
-                                <span className="text-amber-700 dark:text-amber-300 ml-2">
-                                    {myListings.length === 1 ? 'Book Listed' : 'Books Listed'}
-                                </span>
-                            </div>
-                            <div className="bg-green-100 dark:bg-green-900/40 px-4 py-2 rounded-lg">
-                                <span className="text-2xl font-bold text-green-800 dark:text-green-300">
-                                    {soldBooks.length}
-                                </span>
-                                <span className="text-green-700 dark:text-green-400 ml-2">
-                                    Sold
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                        <Link href="/marketplace/create" className="btn-primary">
-                            + Sell a Book
-                        </Link>
-                    </div>
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-4 mb-6 border-b border-amber-200 dark:border-amber-700/50">
-                <button
-                    onClick={() => setActiveTab('listings')}
-                    className={`pb-3 px-4 font-medium transition ${activeTab === 'listings'
-                        ? 'text-amber-900 dark:text-amber-100 border-b-2 border-amber-600 dark:border-amber-400'
-                        : 'text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200'
-                        }`}
-                >
-                    My Listings ({myListings.length})
-                </button>
-            </div>
-
-            {/* My Listings */}
-            {activeTab === 'listings' && (
-                <>
-                    {myListings.length === 0 ? (
-                        <div className="text-center py-16 bg-white/60 dark:bg-amber-900/30 rounded-xl border border-amber-200 dark:border-amber-700/50">
-                            <span className="text-6xl mb-4 block">📚</span>
-                            <h3 className="text-xl font-semibold text-amber-900 dark:text-amber-100 mb-2">
-                                No books listed yet
-                            </h3>
-                            <p className="text-amber-700 dark:text-amber-300 mb-6">
-                                Start selling your books on the marketplace!
-                            </p>
-                            <Link href="/marketplace/create" className="btn-primary">
-                                List Your First Book
-                            </Link>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {myListings.map((listing) => (
-                                <div
-                                    key={listing.id}
-                                    className="bg-white dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition"
-                                >
-                                    {/* Image */}
-                                    <div className="relative aspect-[3/4] bg-amber-100 dark:bg-amber-800/30 flex items-center justify-center">
-                                        {getImageSrc(listing) ? (
-                                            <img
-                                                src={getImageSrc(listing)!}
-                                                alt={listing.title}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                    const target = e.target as HTMLImageElement;
-                                                    target.style.display = 'none';
-                                                    target.parentElement!.innerHTML = '<span class="text-6xl">📚</span>';
-                                                }}
-                                            />
-                                        ) : (
-                                            <span className="text-6xl">📚</span>
-                                        )}
-                                        {/* Status Badge */}
-                                        <span className={`absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded-full ${listing.status === 'LISTED'
-                                            ? 'bg-green-500 text-white'
-                                            : listing.status === 'SOLD'
-                                                ? 'bg-blue-500 text-white'
-                                                : 'bg-gray-500 text-white'
-                                            }`}>
-                                            {listing.status}
-                                        </span>
-                                        {/* Genre Badge */}
-                                        <span className="absolute top-2 left-2 text-xs font-semibold px-2 py-1 rounded-full bg-amber-700/90 text-white">
-                                            {GENRES[listing.genre] || listing.genre}
-                                        </span>
-                                    </div>
-
-                                    {/* Info */}
-                                    <div className="p-4">
-                                        <h3 className="font-semibold text-amber-900 dark:text-amber-100 line-clamp-1">
-                                            {listing.title}
-                                        </h3>
-                                        <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
-                                            by {listing.author}
-                                        </p>
-
-                                        {/* Details */}
-                                        <div className="text-xs text-amber-600 dark:text-amber-400 space-y-1 mb-3">
-                                            <div className="flex justify-between">
-                                                <span>Language:</span>
-                                                <span>{LANGUAGES[listing.language || 'OTHER'] || listing.language || '-'}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Pages:</span>
-                                                <span>{listing.pages || '-'}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Condition:</span>
-                                                <span>{listing.condition.replace('_', ' ')}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Price & Actions */}
-                                        <div className="flex items-center justify-between pt-3 border-t border-amber-100 dark:border-amber-700/30">
-                                            <span className="text-xl font-bold text-amber-900 dark:text-amber-100">
-                                                {listing.price} Lei
-                                            </span>
-                                            <Link
-                                                href={`/marketplace/${listing.id}`}
-                                                className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200"
-                                            >
-                                                View →
-                                            </Link>
-                                        </div>
-
-                                        {/* Rating & Reviews */}
-                                        <div className="flex items-center gap-2 mt-2 text-sm text-amber-600 dark:text-amber-400">
-                                            <span>⭐ {(listing.average_rating || 0).toFixed(1)}</span>
-                                            <span>•</span>
-                                            <span>{listing.review_count || 0} reviews</span>
-                                        </div>
-
-                                        {/* Listed Date */}
-                                        <p className="text-xs text-amber-500 dark:text-amber-500 mt-2">
-                                            Listed on {formatDate(listing.created_at)}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </>
-            )}
+  return (
+    <PageLayout
+      active="profile"
+      pageTitle="Profile"
+      pageSubtitle="Your reading life, gathered in one place."
+      headerActions={
+        <Button variant="secondary" leftIcon={<Edit3 size={14} />}>
+          Edit profile
+        </Button>
+      }
+    >
+      {/* Identity card */}
+      <section className="bc-card p-6 sm:p-8 flex flex-col sm:flex-row gap-6 items-start sm:items-center relative overflow-hidden">
+        <span
+          aria-hidden
+          className="absolute -top-20 -right-16 w-72 h-72 rounded-full bg-bc-primary-grad opacity-10 blur-3xl pointer-events-none"
+        />
+        <div className="grid place-items-center w-24 h-24 rounded-full bg-bc-primary-grad text-white font-display text-3xl font-semibold shadow-bc-primary shrink-0">
+          {initials}
         </div>
-    );
+        <div className="flex-1 min-w-0 relative">
+          <h2 className="font-display text-[26px] font-semibold text-bc-text leading-tight">
+            {username}
+          </h2>
+          <p className="text-bc-subtext text-[13.5px] mt-1 inline-flex items-center gap-1.5">
+            <MapPin size={13} /> {session?.user?.email || "No email provided"}
+          </p>
+          <p className="text-bc-text-soft text-[14.5px] leading-relaxed mt-3 max-w-xl">
+            {session?.user?.role === "author" ? "Author" : "Reader"} on BookConnect.
+          </p>
+        </div>
+      </section>
+
+      {/* Stats */}
+      <section className="bc-stagger grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {realStats.map((s) => (
+          <div
+            key={s.id}
+            className="bc-card bc-card-hover p-5 text-center sm:text-left"
+          >
+            <div className="text-[11px] uppercase tracking-[0.07em] font-bold text-bc-subtext mb-2">
+              {s.label}
+            </div>
+            <div className="font-display text-[2rem] font-semibold text-bc-text leading-none">
+              {isLoading ? "..." : s.value}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* Reading journal + quote */}
+      <section className="grid lg:grid-cols-[1.4fr_1fr] gap-6">
+        <div>
+          <SectionHeader title="Currently on the nightstand" />
+          {isLoading ? (
+             <div className="flex justify-center py-10"><Loader2 className="animate-spin text-bc-primary w-6 h-6" /></div>
+          ) : readingBooks.length === 0 ? (
+             <div className="text-center py-10 text-bc-subtext text-sm bc-card bg-transparent border-dashed">No books currently being read.</div>
+          ) : (
+            <div className="bc-stagger grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
+              {readingBooks.map((entry) => {
+                const progressPct = entry.book.pages ? Math.round((entry.current_page / entry.book.pages) * 100) : 0;
+                return (
+                  <BookCard
+                    key={entry.id}
+                    title={entry.book.title}
+                    author={entry.book.author}
+                    gradient={(entry.book.cover || entry.book.cover_url) ? undefined : getGradientForBook(entry.book.id)}
+                    coverUrl={entry.book.cover || entry.book.cover_url}
+                    meta={`${progressPct}% · Page ${entry.current_page}`}
+                    href={`/books/${entry.book.id}`}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="bc-card p-6 sm:p-7 flex flex-col gap-4 relative overflow-hidden h-fit">
+          <Quote
+            size={28}
+            className="text-bc-primary opacity-80"
+            strokeWidth={2.4}
+          />
+          <p className="font-display text-[20px] leading-snug text-bc-text italic">
+            &ldquo;Memory is a wilderness — once you let yourself in, you may
+            wander a long time before finding your way out.&rdquo;
+          </p>
+          <div className="text-[12.5px] text-bc-subtext">
+            from <em>Norwegian Wood</em> · saved last week
+          </div>
+        </div>
+      </section>
+
+      {/* Activity heatmap */}
+      <section>
+        <SectionHeader title="A year of reading" />
+        <div className="bc-card p-6 overflow-x-auto mt-2">
+          <Heatmap />
+        </div>
+      </section>
+    </PageLayout>
+  );
+}
+
+function Heatmap() {
+  // 53 weeks x 7 days
+  const weeks = 53;
+  const days = 7;
+  const cells: { intensity: number }[][] = Array.from({ length: weeks }, (_, w) =>
+    Array.from({ length: days }, (_, d) => {
+      // pseudo-random pattern that's deterministic
+      const v = Math.sin(w * 1.7 + d * 0.9) * 0.5 + 0.5;
+      const noise = ((w * 7 + d) % 11) / 22;
+      const intensity = Math.max(0, Math.min(1, v * 0.85 + noise));
+      return { intensity: intensity < 0.18 ? 0 : intensity };
+    }),
+  );
+
+  function shade(i: number) {
+    if (i === 0) return "var(--bc-surface-muted)";
+    if (i < 0.4) return "rgba(196, 106, 43, 0.25)";
+    if (i < 0.65) return "rgba(196, 106, 43, 0.5)";
+    if (i < 0.85) return "rgba(196, 106, 43, 0.75)";
+    return "var(--bc-primary)";
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-[3px]">
+        {cells.map((week, w) => (
+          <div key={w} className="flex flex-col gap-[3px]">
+            {week.map((cell, d) => (
+              <span
+                key={d}
+                title={`Week ${w + 1}, day ${d + 1}`}
+                className="w-2.5 h-2.5 rounded-[3px]"
+                style={{ background: shade(cell.intensity) }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-end gap-2 text-[11px] text-bc-subtext">
+        Less
+        {[0, 0.3, 0.55, 0.75, 1].map((v, i) => (
+          <span
+            key={i}
+            className="w-2.5 h-2.5 rounded-[3px]"
+            style={{ background: shade(v) }}
+          />
+        ))}
+        More
+      </div>
+    </div>
+  );
 }

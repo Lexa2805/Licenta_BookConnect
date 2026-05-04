@@ -5,7 +5,7 @@ from .models import Manuscript
 from .serializers import ManuscriptSerializer
 
 class ManuscriptViewSet(viewsets.ModelViewSet):
-    queryset = Manuscript.objects.all()
+    queryset = Manuscript.objects.all().order_by('-updated_at')
     serializer_class = ManuscriptSerializer
 
     def perform_create(self, serializer):
@@ -13,12 +13,13 @@ class ManuscriptViewSet(viewsets.ModelViewSet):
         serializer.save(author_id=author_id)
 
     def get_queryset(self):
-        # Filter by author_id if provided, or show public ones?
-        # For 'studio', we want to see MY manuscripts.
+        queryset = self.queryset
         author_id = self.request.query_params.get('author_id')
         if author_id:
-            return self.queryset.filter(author_id=author_id)
-        return self.queryset
+            return queryset.filter(author_id=author_id)
+
+        # Without an author filter, never expose private drafts from every user.
+        return queryset.filter(status='PUBLISHED')
 
     @action(detail=True, methods=['post'])
     def publish(self, request, pk=None):

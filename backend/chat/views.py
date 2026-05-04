@@ -1,9 +1,25 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
-from django.db.models import Q, Max, Count
+from django.db.models import Q, Count
 from .models import ChatGroup, GroupMember, Message
 from .serializers import ChatGroupSerializer, GroupMemberSerializer, MessageSerializer
+
+
+def build_message_preview(message):
+    content = (message.content or '').strip()
+    if content:
+        return content[:50] + ('...' if len(content) > 50 else '')
+
+    if message.attachment:
+        if (message.attachment_type or '').startswith('image/'):
+            return 'Shared a photo'
+        if message.attachment_name:
+            return f"Shared {message.attachment_name[:40]}"
+        return 'Shared an attachment'
+
+    return ''
 
 class ChatGroupViewSet(viewsets.ModelViewSet):
     queryset = ChatGroup.objects.all()
@@ -44,7 +60,7 @@ class ChatGroupViewSet(viewsets.ModelViewSet):
             group_data['member_count'] = group.member_count
             group_data['is_member'] = True
             if last_msg:
-                group_data['last_message'] = last_msg.content[:50] + ('...' if len(last_msg.content) > 50 else '')
+                group_data['last_message'] = build_message_preview(last_msg)
                 group_data['last_message_time'] = last_msg.timestamp.isoformat()
             result.append(group_data)
         
@@ -84,12 +100,35 @@ class ChatGroupViewSet(viewsets.ModelViewSet):
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def perform_create(self, serializer):
         sender_id = self.request.data.get('sender_id', 'anonymous_sender')
         sender_name = self.request.data.get('sender_name', 'Anonymous')
         receiver_name = self.request.data.get('receiver_name', '')
-        serializer.save(sender_id=sender_id, sender_name=sender_name, receiver_name=receiver_name)
+        attachment = self.request.FILES.get('attachment')
+        attachment_name = self.request.data.get('attachment_name', '')
+        attachment_type = self.request.data.get('attachment_type', '')
+        attachment_size = self.request.data.get('attachment_size')
+
+        if attachment:
+            attachment_name = attachment_name or attachment.name
+            attachment_type = attachment_type or getattr(attachment, 'content_type', '')
+            attachment_size = attachment_size or getattr(attachment, 'size', None)
+
+        try:
+            attachment_size = int(attachment_size) if attachment_size else None
+        except (TypeError, ValueError):
+            attachment_size = None
+
+        serializer.save(
+            sender_id=sender_id,
+            sender_name=sender_name,
+            receiver_name=receiver_name,
+            attachment_name=attachment_name,
+            attachment_type=attachment_type,
+            attachment_size=attachment_size,
+        )
 
     def get_queryset(self):
         # Filter messages by group or receiver
@@ -138,7 +177,7 @@ class MessageViewSet(viewsets.ModelViewSet):
                     'id': other_id,
                     'participant_id': other_id,
                     'participant_name': other_name,
-                    'last_message': msg.content[:50] + ('...' if len(msg.content) > 50 else ''),
+                    'last_message': build_message_preview(msg),
                     'last_message_time': msg.timestamp.isoformat(),
                     'unread_count': 0  # Could be implemented with is_read field
                 }

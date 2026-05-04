@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import { manuscriptsService } from "@/lib/services/manuscripts";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export default function EditorPage() {
     const params = useParams();
     const router = useRouter();
     const id = Number(params.id);
+    const { data: session, status } = useSession();
+    const userId = session?.user?.id as string | undefined;
 
     const [manuscript, setManuscript] = useState<any>(null);
     const [content, setContent] = useState("");
@@ -15,9 +18,11 @@ export default function EditorPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (id) {
-            manuscriptsService.getManuscript(id)
-                .then((data) => {
+        if (status === "loading") return;
+
+        if (id && userId) {
+            manuscriptsService.getManuscript(id, userId)
+                .then((data: any) => {
                     setManuscript(data);
                     setContent(data.content);
                     setLoading(false);
@@ -26,13 +31,15 @@ export default function EditorPage() {
                     console.error(err);
                     setLoading(false);
                 });
+        } else {
+            setLoading(false);
         }
-    }, [id]);
+    }, [id, status, userId]);
 
     const handleSave = async () => {
         setSaving(true);
         try {
-            await manuscriptsService.updateManuscript(id, { content });
+            await manuscriptsService.updateManuscript(id, { content }, userId);
             setSaving(false);
         } catch (err) {
             console.error(err);
@@ -45,7 +52,7 @@ export default function EditorPage() {
         if (!confirm("Are you sure you want to publish this manuscript? It will be visible to everyone.")) return;
 
         try {
-            await manuscriptsService.publishManuscript(id);
+            await manuscriptsService.publishManuscript(id, userId);
             alert("Published successfully!");
             router.push("/studio");
         } catch (err) {

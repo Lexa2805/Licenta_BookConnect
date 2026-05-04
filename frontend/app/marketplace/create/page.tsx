@@ -4,7 +4,11 @@ import { useState } from "react";
 import { marketplaceService } from "@/lib/services/marketplace";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { SectionHeader } from "@/components/ui/SectionTitle";
+import { Upload } from "lucide-react";
 
 const GENRES = [
     { value: 'FANTASY', label: 'Fantasy' },
@@ -108,240 +112,178 @@ export default function CreateListingPage() {
     };
 
     return (
-        <div className="container mx-auto p-4 max-w-2xl">
-            {/* Header */}
-            <div className="mb-8">
-                <Link
-                    href="/marketplace"
-                    className="inline-flex items-center text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 mb-4 transition"
-                >
-                    <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Back to Marketplace
-                </Link>
-                <h1 className="text-3xl font-bold text-amber-900 dark:text-amber-100">Sell a Book</h1>
-                <p className="text-amber-700 dark:text-amber-300 mt-1">
-                    List your book for sale on the marketplace
-                </p>
-            </div>
-
-            {error && (
-                <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
-                    <p className="text-red-700 dark:text-red-300">{error}</p>
-                </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="bg-white dark:bg-amber-900/30 p-6 rounded-xl border border-amber-200 dark:border-amber-700/50 space-y-5">
-                    <h2 className="text-lg font-semibold text-amber-900 dark:text-amber-100 border-b border-amber-200 dark:border-amber-700/50 pb-2">
-                        Book Details
-                    </h2>
-
-                    {/* Title */}
-                    <div>
-                        <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                            Book Title *
-                        </label>
-                        <input
-                            type="text"
-                            name="title"
-                            value={formData.title}
-                            onChange={handleChange}
-                            placeholder="e.g., Harry Potter and the Sorcerer's Stone"
-                            className="w-full border border-amber-200 dark:border-amber-700/50 rounded-lg p-3 bg-white dark:bg-amber-900/20 text-amber-900 dark:text-amber-100 placeholder-amber-400 dark:placeholder-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                            required
-                        />
+        <PageLayout
+            active="marketplace"
+            pageTitle="Sell a Book"
+            pageSubtitle="List your book for sale or swap on the marketplace"
+        >
+            <div className="max-w-2xl">
+                {error && (
+                    <div className="mb-6 p-4 bg-bc-danger/10 border border-bc-danger/20 rounded-bc-md text-bc-danger text-sm">
+                        {error}
                     </div>
+                )}
 
-                    {/* Author */}
-                    <div>
-                        <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                            Author *
-                        </label>
-                        <input
-                            type="text"
-                            name="author"
-                            value={formData.author}
-                            onChange={handleChange}
-                            placeholder="e.g., J.K. Rowling"
-                            className="w-full border border-amber-200 dark:border-amber-700/50 rounded-lg p-3 bg-white dark:bg-amber-900/20 text-amber-900 dark:text-amber-100 placeholder-amber-400 dark:placeholder-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                            required
-                        />
-                    </div>
+                <form onSubmit={handleSubmit} className="space-y-8">
+                    {/* Book Details */}
+                    <div className="bc-card p-6 space-y-5">
+                        <SectionHeader title="Book Details" />
 
-                    {/* Genre and Language */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                                Genre *
-                            </label>
-                            <select
-                                name="genre"
-                                value={formData.genre}
+                            <label className="block text-[13px] font-semibold text-bc-text mb-1.5">Book Title *</label>
+                            <Input
+                                name="title"
+                                value={formData.title}
                                 onChange={handleChange}
-                                className="w-full border border-amber-200 dark:border-amber-700/50 rounded-lg p-3 bg-white dark:bg-amber-900/20 text-amber-900 dark:text-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                            >
-                                {GENRES.map((genre) => (
-                                    <option key={genre.value} value={genre.value}>
-                                        {genre.label}
-                                    </option>
-                                ))}
-                            </select>
+                                placeholder="e.g., Harry Potter and the Sorcerer's Stone"
+                                required
+                            />
                         </div>
+
                         <div>
-                            <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                                Language *
-                            </label>
-                            <select
-                                name="language"
-                                value={formData.language}
+                            <label className="block text-[13px] font-semibold text-bc-text mb-1.5">Author *</label>
+                            <Input
+                                name="author"
+                                value={formData.author}
                                 onChange={handleChange}
-                                className="w-full border border-amber-200 dark:border-amber-700/50 rounded-lg p-3 bg-white dark:bg-amber-900/20 text-amber-900 dark:text-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                            >
-                                {LANGUAGES.map((lang) => (
-                                    <option key={lang.value} value={lang.value}>
-                                        {lang.label}
-                                    </option>
-                                ))}
-                            </select>
+                                placeholder="e.g., J.K. Rowling"
+                                required
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[13px] font-semibold text-bc-text mb-1.5">Genre *</label>
+                                <select
+                                    name="genre"
+                                    value={formData.genre}
+                                    onChange={handleChange}
+                                    className="w-full h-12 px-4 rounded-bc-md bg-bc-surface border border-bc-border text-sm text-bc-text focus:border-bc-primary focus:outline-none transition-all shadow-bc-xs"
+                                >
+                                    {GENRES.map((genre) => (
+                                        <option key={genre.value} value={genre.value}>{genre.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[13px] font-semibold text-bc-text mb-1.5">Language *</label>
+                                <select
+                                    name="language"
+                                    value={formData.language}
+                                    onChange={handleChange}
+                                    className="w-full h-12 px-4 rounded-bc-md bg-bc-surface border border-bc-border text-sm text-bc-text focus:border-bc-primary focus:outline-none transition-all shadow-bc-xs"
+                                >
+                                    {LANGUAGES.map((lang) => (
+                                        <option key={lang.value} value={lang.value}>{lang.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-[13px] font-semibold text-bc-text mb-1.5">Number of Pages</label>
+                            <Input
+                                type="number"
+                                name="pages"
+                                value={formData.pages}
+                                onChange={handleChange}
+                                placeholder="e.g., 320"
+                                min="0"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-[13px] font-semibold text-bc-text mb-1.5">Description *</label>
+                            <textarea
+                                name="description"
+                                value={formData.description}
+                                onChange={handleChange}
+                                placeholder="Describe the book's story, condition details, or anything else buyers should know..."
+                                className="w-full rounded-bc-md bg-bc-surface border border-bc-border p-4 text-sm text-bc-text focus:border-bc-primary focus:outline-none transition-all shadow-bc-xs h-32 resize-none placeholder:text-bc-subtext"
+                                required
+                            />
                         </div>
                     </div>
 
-                    {/* Pages */}
-                    <div>
-                        <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                            Number of Pages
-                        </label>
-                        <input
-                            type="number"
-                            name="pages"
-                            value={formData.pages}
-                            onChange={handleChange}
-                            placeholder="e.g., 320"
-                            className="w-full border border-amber-200 dark:border-amber-700/50 rounded-lg p-3 bg-white dark:bg-amber-900/20 text-amber-900 dark:text-amber-100 placeholder-amber-400 dark:placeholder-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                            min="0"
-                        />
-                    </div>
+                    {/* Pricing & Condition */}
+                    <div className="bc-card p-6 space-y-5">
+                        <SectionHeader title="Pricing & Condition" />
 
-                    {/* Description */}
-                    <div>
-                        <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                            Description *
-                        </label>
-                        <textarea
-                            name="description"
-                            value={formData.description}
-                            onChange={handleChange}
-                            placeholder="Describe the book's story, condition details, or anything else buyers should know..."
-                            className="w-full border border-amber-200 dark:border-amber-700/50 rounded-lg p-3 bg-white dark:bg-amber-900/20 text-amber-900 dark:text-amber-100 placeholder-amber-400 dark:placeholder-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500 h-32 resize-none"
-                            required
-                        />
-                    </div>
-                </div>
-
-                <div className="bg-white dark:bg-amber-900/30 p-6 rounded-xl border border-amber-200 dark:border-amber-700/50 space-y-5">
-                    <h2 className="text-lg font-semibold text-amber-900 dark:text-amber-100 border-b border-amber-200 dark:border-amber-700/50 pb-2">
-                        Pricing & Condition
-                    </h2>
-
-                    {/* Price */}
-                    <div>
-                        <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                            Price (Lei) *
-                        </label>
-                        <div className="relative">
-                            <input
+                        <div>
+                            <label className="block text-[13px] font-semibold text-bc-text mb-1.5">Price (Lei) *</label>
+                            <Input
                                 type="number"
                                 name="price"
                                 value={formData.price}
                                 onChange={handleChange}
                                 placeholder="0.00"
-                                className="w-full border border-amber-200 dark:border-amber-700/50 rounded-lg p-3 pr-16 bg-white dark:bg-amber-900/20 text-amber-900 dark:text-amber-100 placeholder-amber-400 dark:placeholder-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                 step="0.01"
                                 min="0"
+                                rightSlot={<span className="text-sm font-semibold text-bc-subtext">Lei</span>}
                                 required
                             />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-600 dark:text-amber-400 font-medium">
-                                Lei
-                            </span>
                         </div>
-                    </div>
 
-                    {/* Condition */}
-                    <div>
-                        <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
-                            Condition *
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {CONDITIONS.map((cond) => (
-                                <label
-                                    key={cond.value}
-                                    className={`flex items-start p-3 border rounded-lg cursor-pointer transition ${formData.condition === cond.value
-                                        ? 'border-amber-500 bg-amber-50 dark:bg-amber-800/40'
-                                        : 'border-amber-200 dark:border-amber-700/50 hover:bg-amber-50 dark:hover:bg-amber-800/20'
+                        <div>
+                            <label className="block text-[13px] font-semibold text-bc-text mb-2.5">Condition *</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {CONDITIONS.map((cond) => (
+                                    <label
+                                        key={cond.value}
+                                        className={`flex items-start p-3 border rounded-bc-md cursor-pointer transition-all ${
+                                            formData.condition === cond.value
+                                                ? 'border-bc-primary bg-bc-primary-soft shadow-bc-sm'
+                                                : 'border-bc-border hover:border-bc-border-strong hover:bg-bc-surface-muted'
                                         }`}
-                                >
-                                    <input
-                                        type="radio"
-                                        name="condition"
-                                        value={cond.value}
-                                        checked={formData.condition === cond.value}
-                                        onChange={handleChange}
-                                        className="mt-1 mr-3"
-                                    />
-                                    <div>
-                                        <span className="font-medium text-amber-900 dark:text-amber-100">
-                                            {cond.label}
-                                        </span>
-                                        <p className="text-xs text-amber-600 dark:text-amber-400">
-                                            {cond.description}
-                                        </p>
-                                    </div>
-                                </label>
-                            ))}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="condition"
+                                            value={cond.value}
+                                            checked={formData.condition === cond.value}
+                                            onChange={handleChange}
+                                            className="mt-1 mr-3 accent-bc-primary"
+                                        />
+                                        <div>
+                                            <span className="block text-[14px] font-semibold text-bc-text leading-tight mb-0.5">
+                                                {cond.label}
+                                            </span>
+                                            <p className="text-[12px] text-bc-subtext">
+                                                {cond.description}
+                                            </p>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <div className="bg-white dark:bg-amber-900/30 p-6 rounded-xl border border-amber-200 dark:border-amber-700/50 space-y-5">
-                    <h2 className="text-lg font-semibold text-amber-900 dark:text-amber-100 border-b border-amber-200 dark:border-amber-700/50 pb-2">
-                        Book Cover Image
-                    </h2>
 
                     {/* Image Upload */}
-                    <div>
-                        <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
-                            Upload Photo
-                        </label>
-                        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-amber-200 dark:border-amber-700/50 border-dashed rounded-lg hover:border-amber-400 dark:hover:border-amber-500 transition">
-                            <div className="space-y-1 text-center">
+                    <div className="bc-card p-6 space-y-5">
+                        <SectionHeader title="Book Cover Image" />
+
+                        <div>
+                            <label className="block text-[13px] font-semibold text-bc-text mb-1.5">Upload Photo</label>
+                            <div className="border-2 border-dashed border-bc-border rounded-bc-md p-8 text-center hover:border-bc-primary/50 transition-colors bg-bc-surface-muted/50">
                                 {imagePreview ? (
                                     <div className="mb-4">
                                         <img
                                             src={imagePreview}
                                             alt="Preview"
-                                            className="mx-auto h-48 w-auto rounded-lg object-cover"
+                                            className="mx-auto h-48 w-auto rounded-md object-cover shadow-bc-md"
                                         />
                                     </div>
                                 ) : (
-                                    <svg
-                                        className="mx-auto h-12 w-12 text-amber-400"
-                                        stroke="currentColor"
-                                        fill="none"
-                                        viewBox="0 0 48 48"
-                                    >
-                                        <path
-                                            d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                                            strokeWidth={2}
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        />
-                                    </svg>
+                                    <div className="w-12 h-12 rounded-full bg-bc-surface border border-bc-border flex items-center justify-center mx-auto mb-3 text-bc-subtext">
+                                        <Upload size={20} />
+                                    </div>
                                 )}
-                                <div className="flex text-sm text-amber-600 dark:text-amber-400 justify-center">
-                                    <label className="relative cursor-pointer rounded-md font-medium text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-200">
-                                        <span>{imagePreview ? 'Change image' : 'Upload a file'}</span>
+                                
+                                <div className="flex flex-col items-center gap-1">
+                                    <label className="cursor-pointer">
+                                        <span className="text-[14px] font-semibold text-bc-primary hover:underline">
+                                            {imagePreview ? 'Change image' : 'Upload a file'}
+                                        </span>
                                         <input
                                             type="file"
                                             name="image"
@@ -350,48 +292,23 @@ export default function CreateListingPage() {
                                             className="sr-only"
                                         />
                                     </label>
-                                    {!imagePreview && <p className="pl-1">or drag and drop</p>}
+                                    {!imagePreview && <span className="text-[13px] text-bc-subtext">or drag and drop</span>}
+                                    <span className="text-[11.5px] text-bc-subtext mt-1">PNG, JPG up to 10MB</span>
                                 </div>
-                                <p className="text-xs text-amber-500 dark:text-amber-500">
-                                    PNG, JPG, GIF up to 10MB
-                                </p>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Seller Info Preview */}
-                <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl border border-amber-200 dark:border-amber-700/50">
-                    <p className="text-sm text-amber-700 dark:text-amber-300">
-                        <span className="font-medium">Listing as:</span>{" "}
-                        {session?.user?.username || session?.user?.name || "Anonymous Seller"}
-                    </p>
-                </div>
-
-                {/* Submit */}
-                <div className="flex gap-4">
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="flex-1 btn-primary py-3 text-lg disabled:opacity-50"
-                    >
-                        {loading ? (
-                            <span className="flex items-center justify-center">
-                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Creating...
-                            </span>
-                        ) : (
-                            "List Book for Sale"
-                        )}
-                    </button>
-                    <Link href="/marketplace" className="btn-secondary py-3 px-6">
-                        Cancel
-                    </Link>
-                </div>
-            </form>
-        </div>
+                    <div className="flex items-center gap-4 pt-4">
+                        <Button type="submit" disabled={loading} className="w-40 justify-center">
+                            {loading ? "Creating..." : "List for Sale"}
+                        </Button>
+                        <Button type="button" variant="secondary" onClick={() => router.push("/marketplace")}>
+                            Cancel
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        </PageLayout>
     );
 }

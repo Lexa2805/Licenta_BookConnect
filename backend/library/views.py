@@ -6,6 +6,8 @@ from django.db.models import Q
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.views.decorators.http import require_POST
+from django.utils import timezone
+from datetime import timedelta
 from .models import LibraryBook, UserLibrary, Bookmark, ReadingSession
 from .serializers import (
     LibraryBookSerializer, UserLibrarySerializer,
@@ -104,10 +106,10 @@ class LibraryBookViewSet(viewsets.ModelViewSet):
                 Q(description__icontains=search)
             )
         
-        # Filter by genre
+        # Filter by genre (icontains works on SQLite; __contains only works on PostgreSQL)
         genre = self.request.query_params.get('genre')
         if genre:
-            queryset = queryset.filter(genres__contains=genre)
+            queryset = queryset.filter(genres__icontains=genre)
         
         # Filter by featured
         featured = self.request.query_params.get('featured')
@@ -251,7 +253,6 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def end_session(self, request, pk=None):
         """End a reading session"""
-        from django.utils import timezone
         session = self.get_object()
         session.ended_at = timezone.now()
         session.end_page = request.data.get('end_page', session.start_page)
@@ -269,3 +270,33 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(session)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='streak')
+    def streak(self, request):
+        """Return the user's current reading streak based on ReadingSession dates."""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Collect unique calendar days with at least one session start.
+        days = set(ReadingSession.objects.filter(user_id=user_id).dates('started_at', 'day'))
+        today = timezone.localdate()
+
+        # Streak counts consecutive days ending today; if not read today, allow ending yesterday.
+        cursor = today
+        if cursor not in days and (today - timedelta(days=1)) in days:
+            cursor = today - timedelta(days=1)
+
+        streak_days = 0
+        while cursor in days:
+            streak_days += 1
+            cursor = cursor - timedelta(days=1)
+
+        last_read_date = max(days).isoformat() if days else None
+
+        return Response({
+            'streak_days': streak_days,
+            'active_today': today in days,
+            'last_read_date': last_read_date,
+            'tracked_days': len(days),
+        })

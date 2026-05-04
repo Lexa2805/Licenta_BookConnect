@@ -54,7 +54,7 @@ export default function GroupChatPage() {
     const loadMessages = async () => {
         try {
             const data = await chatService.getMessages(groupId);
-            setMessages(data);
+            setMessages(data as Message[]);
         } catch (err) {
             console.error("Failed to load messages:", err);
         } finally {

@@ -1,5 +1,24 @@
 import { api } from "../api";
 
+function sanitizeTextInput(
+    value?: string,
+    options?: { collapseWhitespace?: boolean },
+) {
+    if (!value) {
+        return undefined;
+    }
+
+    const sanitized = value
+        .replace(/\u0000/g, "")
+        .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ");
+
+    const normalized = options?.collapseWhitespace ?? true
+        ? sanitized.replace(/\s+/g, " ").trim()
+        : sanitized.trim();
+
+    return normalized || undefined;
+}
+
 export interface LibraryBook {
     id: number;
     title: string;
@@ -61,6 +80,13 @@ export interface Bookmark {
     note: string;
     color: string;
     created_at: string;
+}
+
+export interface ReadingStreak {
+    streak_days: number;
+    active_today: boolean;
+    last_read_date: string | null;
+    tracked_days: number;
 }
 
 export const libraryService = {
@@ -139,6 +165,11 @@ export const libraryService = {
         return response.data as UserLibraryEntry[];
     },
 
+    getAllUserLibrary: async () => {
+        const response = await api.get('/api/library/user-library/');
+        return response.data as UserLibraryEntry[];
+    },
+
     addToLibrary: async (userId: string, bookId: number) => {
         const response = await api.post('/api/library/user-library/', {
             user_id: userId,
@@ -186,7 +217,13 @@ export const libraryService = {
     },
 
     createBookmark: async (data: { user_id: string; book: number; page_number: number; paragraph_text?: string; note?: string; color?: string }) => {
-        const response = await api.post('/api/library/bookmarks/', data);
+        const payload = {
+            ...data,
+            paragraph_text: sanitizeTextInput(data.paragraph_text),
+            note: sanitizeTextInput(data.note, { collapseWhitespace: false }),
+        };
+
+        const response = await api.post('/api/library/bookmarks/', payload);
         return response.data as Bookmark;
     },
 
@@ -209,5 +246,12 @@ export const libraryService = {
             end_page: endPage,
         });
         return response.data;
+    },
+
+    getReadingStreak: async (userId: string) => {
+        const response = await api.get('/api/library/reading-sessions/streak/', {
+            params: { user_id: userId },
+        });
+        return response.data as ReadingStreak;
     },
 };
