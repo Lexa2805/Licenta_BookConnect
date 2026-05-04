@@ -1,8 +1,28 @@
+import json
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Manuscript
 from .serializers import ManuscriptSerializer
+
+
+@csrf_exempt
+def generate_text(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        text = data.get("text", "")
+
+        from ai.generator import generate
+
+        result = generate(text)
+
+        return JsonResponse({"result": result})
+
+    return JsonResponse({"error": "Only POST requests are allowed."}, status=405)
+
 
 class ManuscriptViewSet(viewsets.ModelViewSet):
     queryset = Manuscript.objects.all().order_by('-updated_at')

@@ -28,6 +28,7 @@ urlpatterns = [
     path("api/manuscripts/", include("manuscripts.urls")),
     path("api/chat/", include("chat.urls")),
     path("api/library/", include("library.urls")),
+    path("ai/", include("ai.urls")),
 
     # Template-based book management UI
     path("manage/books/", include("library.manage_urls")),

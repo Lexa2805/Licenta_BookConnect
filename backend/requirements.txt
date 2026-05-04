@@ -8,3 +8,5 @@ drf-spectacular-sidecar>=2024.1.1
 python-dotenv>=1.0.0
 werkzeug>=3.0.0
 Pillow>=10.0.0
+sentencepiece>=0.2.0
+torch>=2.5.0
