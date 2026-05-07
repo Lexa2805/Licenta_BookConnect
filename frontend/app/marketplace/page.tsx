@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { marketplaceService } from "@/lib/services/marketplace";
 import { useRouter } from "next/navigation";
 
-const FILTERS = ["All", "Swap-friendly", "Under $10", "Like new", "Near me"];
+const FILTERS = ["All", "Swap-friendly", "Under 10 Lei", "Like new", "Near me"];
 
 export default function MarketplacePage() {
   const [filter, setFilter] = useState("All");
@@ -37,7 +37,7 @@ export default function MarketplacePage() {
 
   const filteredListings = listings.filter((book) => {
     if (filter === "All") return true;
-    if (filter === "Under $10") return parseFloat(book.price) < 10;
+    if (filter === "Under 10 Lei") return parseFloat(book.price) < 10;
     if (filter === "Like new") return book.condition.toLowerCase().includes("like new");
     if (filter === "Swap-friendly") return parseFloat(book.price) === 0; // Assuming 0 price means swap
     return true; // "Near me" logic would require geolocation, show all for now
@@ -101,7 +101,7 @@ export default function MarketplacePage() {
                     </p>
                   </div>
                   <span className="font-display text-[18px] font-semibold text-bc-text shrink-0">
-                    ${book.price}
+                    {book.price} Lei
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">

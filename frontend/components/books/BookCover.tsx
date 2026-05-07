@@ -39,7 +39,11 @@ export function BookCover({
       }}
     >
       {coverUrl ? (
-        <img src={coverUrl} alt={title} className="w-full h-full object-cover" />
+        <img
+          src={coverUrl}
+          alt={title}
+          className="w-full h-full object-contain bg-bc-surface-muted"
+        />
       ) : (
         <>
           <h3

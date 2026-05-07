@@ -71,14 +71,14 @@ export function BookCard({
           />
         </button>
       )}
-      <div className="transition-transform duration-300 ease-bc-ease group-hover:-translate-y-1.5 group-hover:-rotate-1">
+      <div className="grid place-items-center transition-transform duration-300 ease-bc-ease group-hover:-translate-y-1.5 group-hover:-rotate-1">
         <BookCover
           title={title}
           author={author}
           gradient={gradient}
           coverUrl={coverUrl}
-          width="100%"
-          height={210}
+          width="min(100%, 168px)"
+          height={235}
         />
       </div>
       <div className="pt-3 px-1">

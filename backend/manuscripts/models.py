@@ -21,3 +21,19 @@ class Manuscript(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.status})"
+
+
+class ManuscriptFeedback(models.Model):
+    manuscript = models.ForeignKey(
+        Manuscript,
+        on_delete=models.CASCADE,
+        related_name='feedback',
+    )
+    user_id = models.CharField(max_length=255)
+    user_name = models.CharField(max_length=255, default='Anonymous')
+    selected_text = models.TextField(blank=True)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Feedback by {self.user_name} on {self.manuscript.title}"

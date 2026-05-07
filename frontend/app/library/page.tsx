@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Grid3x3, List, Plus, Upload, Loader2 } from "lucide-react";
+import { Grid3x3, List, Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { PageLayout } from "@/components/layout/PageLayout";
-import { Button } from "@/components/ui/Button";
 import { Pill } from "@/components/ui/Pill";
 import { BookCard } from "@/components/books/BookCard";
 import { useSession } from "next-auth/react";
@@ -20,12 +20,14 @@ const FILTERS = [
 export default function LibraryPage() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const searchQuery = searchParams.get("search")?.trim() ?? "";
 
   const { data: allBooks = [], isLoading: loadingBooks } = useQuery({
-    queryKey: ["all-books"],
-    queryFn: () => libraryService.getBooks(),
+    queryKey: ["all-books", searchQuery],
+    queryFn: () => libraryService.getBooks(searchQuery ? { search: searchQuery } : undefined),
   });
 
   const { data: userLibrary = [], isLoading: loadingLibrary } = useQuery({
@@ -131,14 +133,10 @@ export default function LibraryPage() {
     <PageLayout
       active="library"
       pageTitle="Your library"
-      pageSubtitle={`${allBooks.length} books available · ${readingCount} currently reading`}
-      headerActions={
-        <>
-          <Button variant="secondary" leftIcon={<Upload size={15} />}>
-            Import
-          </Button>
-          <Button leftIcon={<Plus size={15} />}>Add a book</Button>
-        </>
+      pageSubtitle={
+        searchQuery
+          ? `${allBooks.length} result${allBooks.length === 1 ? "" : "s"} for "${searchQuery}"`
+          : `${allBooks.length} books available · ${readingCount} currently reading`
       }
     >
       <div className="flex flex-wrap items-center justify-between gap-4">

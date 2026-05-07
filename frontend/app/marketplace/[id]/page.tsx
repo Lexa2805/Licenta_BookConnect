@@ -1,5 +1,6 @@
 "use client";
 
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -44,10 +45,22 @@ export default function BookDetailPage() {
     const [reviewRating, setReviewRating] = useState(5);
     const [reviewComment, setReviewComment] = useState("");
     const [submittingReview, setSubmittingReview] = useState(false);
+    const [isWishlisted, setIsWishlisted] = useState(false);
 
     useEffect(() => {
         if (id) {
             loadListing();
+        }
+    }, [id]);
+
+    useEffect(() => {
+        if (!id) return;
+
+        try {
+            const saved = JSON.parse(localStorage.getItem("bookconnect-marketplace-wishlist") || "[]") as number[];
+            setIsWishlisted(saved.includes(id));
+        } catch {
+            setIsWishlisted(false);
         }
     }, [id]);
 
@@ -96,7 +109,7 @@ export default function BookDetailPage() {
         );
     };
 
-    const handleSubmitReview = async (e: React.FormEvent) => {
+    const handleSubmitReview = async (e: FormEvent) => {
         e.preventDefault();
         if (!session?.user) {
             alert("Please log in to leave a review");
@@ -122,6 +135,41 @@ export default function BookDetailPage() {
             alert("Failed to submit review. Please try again.");
         } finally {
             setSubmittingReview(false);
+        }
+    };
+
+    const handleBuyNow = () => {
+        if (!listing) return;
+
+        if (!session?.user) {
+            router.push("/login");
+            return;
+        }
+
+        if (listing.seller_id === session.user.id) {
+            alert("This is your own listing.");
+            return;
+        }
+
+        router.push(
+            `/community/dm/${listing.seller_id}?name=${encodeURIComponent(
+                listing.seller_name,
+            )}&book=${encodeURIComponent(listing.title)}`,
+        );
+    };
+
+    const handleToggleWishlist = () => {
+        if (!listing) return;
+
+        try {
+            const saved = JSON.parse(localStorage.getItem("bookconnect-marketplace-wishlist") || "[]") as number[];
+            const next = saved.includes(listing.id)
+                ? saved.filter((itemId) => itemId !== listing.id)
+                : [listing.id, ...saved];
+            localStorage.setItem("bookconnect-marketplace-wishlist", JSON.stringify(next));
+            setIsWishlisted(next.includes(listing.id));
+        } catch {
+            alert("Could not update wishlist. Please try again.");
         }
     };
 
@@ -241,11 +289,19 @@ export default function BookDetailPage() {
                                 {listing.price} Lei
                             </span>
                         </div>
-                        <button className="w-full btn-primary py-3 text-lg">
+                        <button
+                            type="button"
+                            onClick={handleBuyNow}
+                            className="w-full btn-primary py-3 text-lg"
+                        >
                             Buy Now
                         </button>
-                        <button className="w-full mt-3 btn-secondary py-3">
-                            Add to Wishlist
+                        <button
+                            type="button"
+                            onClick={handleToggleWishlist}
+                            className="w-full mt-3 btn-secondary py-3"
+                        >
+                            {isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
                         </button>
                     </div>
 

@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { SectionHeader } from "@/components/ui/SectionTitle";
 import { BookCard } from "@/components/books/BookCard";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { libraryService } from "@/lib/services/library";
 
 export default function ProfilePage() {
   const { data: session } = useSession();
+  const router = useRouter();
   
   const username = session?.user?.username || "Guest";
   const initials = username.substring(0, 2).toUpperCase();
@@ -53,7 +55,11 @@ export default function ProfilePage() {
       pageTitle="Profile"
       pageSubtitle="Your reading life, gathered in one place."
       headerActions={
-        <Button variant="secondary" leftIcon={<Edit3 size={14} />}>
+        <Button
+          variant="secondary"
+          leftIcon={<Edit3 size={14} />}
+          onClick={() => router.push("/settings")}
+        >
           Edit profile
         </Button>
       }

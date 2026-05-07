@@ -4,9 +4,10 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 from .models import Manuscript
-from .serializers import ManuscriptSerializer
+from .serializers import ManuscriptFeedbackSerializer, ManuscriptSerializer
 
 
 @csrf_exempt
@@ -35,6 +36,13 @@ class ManuscriptViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = self.queryset
         author_id = self.request.query_params.get('author_id')
+
+        if self.request.method not in SAFE_METHODS:
+            if author_id:
+                return queryset.filter(author_id=author_id)
+
+            return queryset.none()
+
         if author_id:
             return queryset.filter(author_id=author_id)
 
@@ -47,3 +55,25 @@ class ManuscriptViewSet(viewsets.ModelViewSet):
         manuscript.status = 'PUBLISHED'
         manuscript.save()
         return Response({'status': 'manuscript published'})
+
+    @action(detail=True, methods=['get', 'post'])
+    def feedback(self, request, pk=None):
+        try:
+            manuscript = Manuscript.objects.get(pk=pk, status='PUBLISHED')
+        except Manuscript.DoesNotExist:
+            return Response(
+                {'detail': 'Published manuscript not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if request.method == 'GET':
+            serializer = ManuscriptFeedbackSerializer(
+                manuscript.feedback.all().order_by('-created_at'),
+                many=True,
+            )
+            return Response(serializer.data)
+
+        serializer = ManuscriptFeedbackSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(manuscript=manuscript)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

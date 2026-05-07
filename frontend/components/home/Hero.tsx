@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, Coffee, Headphones, Loader2, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../ui/Button";
 import { Eyebrow } from "../ui/Eyebrow";
@@ -19,6 +20,7 @@ function getGradientForBook(id: number) {
 }
 
 export function Hero() {
+  const router = useRouter();
   const { data: books = [], isLoading } = useQuery({
     queryKey: ["hero-books"],
     queryFn: async () => {
@@ -32,6 +34,7 @@ export function Hero() {
   });
 
   const heroBooks = books.slice(0, 3);
+  const detailsBookId = heroBooks[1]?.id ?? heroBooks[0]?.id;
   const heroTitle = heroBooks[1]?.title || heroBooks[0]?.title || "your next chapter";
   const heroAuthor = heroBooks[1]?.author || heroBooks[0]?.author || "the library";
 
@@ -99,10 +102,19 @@ export function Hero() {
           </p>
 
           <div className="mb-7 flex flex-wrap gap-3">
-            <Button size="lg" rightIcon={<ArrowRight size={16} />}>
+            <Button
+              size="lg"
+              rightIcon={<ArrowRight size={16} />}
+              onClick={() => router.push("/library")}
+            >
               Browse library
             </Button>
-            <Button size="lg" variant="secondary">
+            <Button
+              size="lg"
+              variant="secondary"
+              disabled={!detailsBookId}
+              onClick={() => detailsBookId && router.push(`/books/${detailsBookId}`)}
+            >
               Open book details
             </Button>
           </div>
