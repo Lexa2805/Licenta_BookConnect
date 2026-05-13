@@ -1,7 +1,8 @@
 import { api } from "../api";
 
 export interface DirectMessage {
-    id: number;
+    id: string | number;
+    _id?: string;
     sender_id: string;
     sender_name?: string;
     receiver_id: string;
@@ -25,13 +26,14 @@ export interface Conversation {
 }
 
 export interface ChatGroup {
-    id: number;
+    id: string | number;
+    _id?: string;
     name: string;
     description: string;
     created_at: string;
     created_by?: string;
     member_count?: number;
-    members?: Array<{ id: number; user_id: string; joined_at: string }>;
+    members?: Array<{ id: string | number; user_id: string; joined_at: string }>;
     is_member?: boolean;
     last_message?: string;
     last_message_time?: string;
@@ -63,7 +65,7 @@ export const chatService = {
         return response.data;
     },
 
-    getGroup: async (groupId: number): Promise<ChatGroup> => {
+    getGroup: async (groupId: string | number): Promise<ChatGroup> => {
         const response = await api.get(`/api/chat/groups/${groupId}/`);
         return response.data;
     },
@@ -73,21 +75,21 @@ export const chatService = {
         return response.data;
     },
 
-    joinGroup: async (groupId: number, userId: string) => {
+    joinGroup: async (groupId: string | number, userId: string) => {
         const response = await api.post(`/api/chat/groups/${groupId}/join/`, { user_id: userId });
         return response.data;
     },
 
-    leaveGroup: async (groupId: number, userId: string) => {
+    leaveGroup: async (groupId: string | number, userId: string) => {
         const response = await api.post(`/api/chat/groups/${groupId}/leave/`, { user_id: userId });
         return response.data;
     },
 
-    getGroupMembers: async (groupId: number) => {
+    getGroupMembers: async (groupId: string | number) => {
         const response = await api.get(`/api/chat/groups/${groupId}/members/`);
         return response.data;
     },
-    getMessages: async (groupId?: number, receiverId?: string, senderId?: string) => {
+    getMessages: async (groupId?: string | number, receiverId?: string, senderId?: string) => {
         const params: any = {};
         if (groupId) params.group_id = groupId;
         if (receiverId) params.receiver_id = receiverId;

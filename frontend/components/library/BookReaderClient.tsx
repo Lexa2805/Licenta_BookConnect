@@ -33,7 +33,7 @@ type BookmarkDraft = {
 };
 
 type SidebarVibeCard = {
-  bookmarkId: number;
+  bookmarkId: string | number;
   result: VibeCardResult;
 };
 
@@ -270,7 +270,7 @@ export function BookReaderClient({
   bookId,
   initialBook,
 }: {
-  bookId: number;
+  bookId: string | number;
   initialBook: LibraryBook;
 }) {
   const { data: session } = useSession();
@@ -291,14 +291,14 @@ export function BookReaderClient({
   const [selectedMoodEmoji, setSelectedMoodEmoji] = useState("");
   const [vibeCardThemeId, setVibeCardThemeId] = useState<VibeCardThemeId>("editorial");
   const [vibeCardStickers, setVibeCardStickers] = useState<VibeCardSticker[]>([]);
-  const [sidebarVibeLoading, setSidebarVibeLoading] = useState<number | null>(null);
+  const [sidebarVibeLoading, setSidebarVibeLoading] = useState<string | number | null>(null);
   const [sidebarVibeResult, setSidebarVibeResult] = useState<SidebarVibeCard | null>(null);
   const [fontSize, setFontSize] = useState(16);
   const [isDarkReader, setIsDarkReader] = useState(false);
   const [pdfScale, setPdfScale] = useState(1);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [loadingLibraryState, setLoadingLibraryState] = useState(true);
-  const [readingSessionId, setReadingSessionId] = useState<number | null>(null);
+  const [readingSessionId, setReadingSessionId] = useState<string | number | null>(null);
   const currentPageRef = useRef(1);
   const sessionStartedRef = useRef(false);
   const magicSuggestRequestRef = useRef(0);
@@ -356,7 +356,7 @@ export function BookReaderClient({
       setLoadingLibraryState(true);
       try {
         const library = await libraryService.getUserLibrary(userId);
-        const entry = library.find((item) => item.book.id === bookId);
+        const entry = library.find((item) => String(item.book.id) === String(bookId));
         if (!cancelled && entry?.current_page) {
           const nextPage = clampPage(entry.current_page, maxPages);
           setCurrentPage(nextPage);
@@ -386,7 +386,7 @@ export function BookReaderClient({
     sessionStartedRef.current = true;
     libraryService
       .startReadingSession(userId, bookId, currentPageRef.current)
-      .then((readingSession: { id?: number } | undefined) => {
+      .then((readingSession: { id?: string | number } | undefined) => {
         if (readingSession?.id) {
           setReadingSessionId(readingSession.id);
         }
@@ -412,7 +412,7 @@ export function BookReaderClient({
     try {
       setSaveStatus("saving");
       const library = await libraryService.getUserLibrary(userId);
-      let entry = library.find((item) => item.book.id === bookId);
+      let entry = library.find((item) => String(item.book.id) === String(bookId));
 
       if (!entry) {
         entry = await libraryService.addToLibrary(userId, bookId);
@@ -657,7 +657,7 @@ export function BookReaderClient({
   );
 
   const handleDeleteBookmark = useCallback(
-    async (bookmarkId: number) => {
+    async (bookmarkId: string | number) => {
       try {
         await libraryService.deleteBookmark(bookmarkId);
         await loadBookmarks();

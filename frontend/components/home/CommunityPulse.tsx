@@ -58,8 +58,14 @@ function formatRelativeTime(value?: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(value));
 }
 
-function avatarColors(groupId: number) {
-  return Array.from({ length: 3 }, (_, index) => AVATAR_COLORS[(groupId + index) % AVATAR_COLORS.length]);
+function avatarSeed(groupId: string | number) {
+  if (typeof groupId === "number") return groupId;
+  return String(groupId).split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+}
+
+function avatarColors(groupId: string | number) {
+  const seed = avatarSeed(groupId);
+  return Array.from({ length: 3 }, (_, index) => AVATAR_COLORS[(seed + index) % AVATAR_COLORS.length]);
 }
 
 function groupActivityDate(group: ChatGroup) {
@@ -86,7 +92,7 @@ export function CommunityPulse() {
         Promise.all(circles.slice(0, 5).map((circle) => chatService.getMessages(circle.id))),
       ]);
 
-      const circleById = new Map(circles.map((circle) => [circle.id, circle.name]));
+      const circleById = new Map(circles.map((circle) => [String(circle.id), circle.name]));
       const libraryActivities: ActivityItem[] = userLibrary
         .filter((entry) => entry.status === "FINISHED" || entry.status === "WANT_TO_READ")
         .map((entry) => ({
@@ -127,7 +133,7 @@ export function CommunityPulse() {
           content: (
             <span>
               <strong>{message.sender_name || "Someone"}</strong> posted in{" "}
-              <strong>{circleById.get(message.group) || "a circle"}</strong>
+              <strong>{circleById.get(String(message.group)) || "a circle"}</strong>
             </span>
           ),
         }));

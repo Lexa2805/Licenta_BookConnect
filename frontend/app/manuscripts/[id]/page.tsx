@@ -22,7 +22,7 @@ function formatDate(value: string) {
 
 export default function PublicManuscriptReaderPage() {
   const params = useParams();
-  const manuscriptId = Number(params.id);
+  const manuscriptId = String(params.id);
   const { data: session } = useSession();
   const queryClient = useQueryClient();
 
@@ -32,7 +32,7 @@ export default function PublicManuscriptReaderPage() {
   const { data: manuscript, isLoading, error } = useQuery({
     queryKey: ["public-manuscript", manuscriptId],
     queryFn: () => manuscriptsService.getManuscript(manuscriptId),
-    enabled: Number.isFinite(manuscriptId),
+    enabled: Boolean(manuscriptId),
   });
 
   const feedback = useMemo(() => manuscript?.feedback ?? [], [manuscript?.feedback]);

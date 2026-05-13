@@ -8,11 +8,7 @@ export default async function BookReaderPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const bookId = Number(id);
-
-  if (!Number.isInteger(bookId) || bookId <= 0) {
-    notFound();
-  }
+  const bookId = id;
 
   try {
     const book = await libraryService.getBook(bookId);

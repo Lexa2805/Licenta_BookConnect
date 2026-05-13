@@ -1,8 +1,8 @@
 import { api } from "../api";
 
 export interface ManuscriptFeedback {
-    id: number;
-    manuscript: number;
+    id: string | number;
+    manuscript: string | number;
     user_id: string;
     user_name: string;
     selected_text: string;
@@ -11,12 +11,14 @@ export interface ManuscriptFeedback {
 }
 
 export interface Manuscript {
-    id: number;
+    id: string | number;
+    _id?: string;
     title: string;
     content: string;
     author_id: string;
     status: "DRAFT" | "PUBLISHED" | "ARCHIVED" | string;
     file?: string | null;
+    file_url?: string | null;
     feedback?: ManuscriptFeedback[];
     created_at: string;
     updated_at: string;
@@ -33,35 +35,35 @@ export const manuscriptsService = {
         const response = await api.post("/api/manuscripts/", data);
         return response.data;
     },
-    updateManuscript: async (id: number, data: any, authorId?: string) => {
+    updateManuscript: async (id: string | number, data: any, authorId?: string) => {
         const response = await api.patch(`/api/manuscripts/${id}/`, data, {
             params: authorId ? { author_id: authorId } : undefined,
         });
         return response.data;
     },
-    deleteManuscript: async (id: number, authorId?: string) => {
+    deleteManuscript: async (id: string | number, authorId?: string) => {
         await api.delete(`/api/manuscripts/${id}/`, {
             params: authorId ? { author_id: authorId } : undefined,
         });
     },
-    publishManuscript: async (id: number, authorId?: string) => {
+    publishManuscript: async (id: string | number, authorId?: string) => {
         const response = await api.post(`/api/manuscripts/${id}/publish/`, undefined, {
             params: authorId ? { author_id: authorId } : undefined,
         });
         return response.data;
     },
-    getManuscript: async (id: number, authorId?: string): Promise<Manuscript> => {
+    getManuscript: async (id: string | number, authorId?: string): Promise<Manuscript> => {
         const response = await api.get(`/api/manuscripts/${id}/`, {
             params: authorId ? { author_id: authorId } : undefined,
         });
         return response.data;
     },
-    getFeedback: async (id: number): Promise<ManuscriptFeedback[]> => {
+    getFeedback: async (id: string | number): Promise<ManuscriptFeedback[]> => {
         const response = await api.get(`/api/manuscripts/${id}/feedback/`);
         return response.data;
     },
     createFeedback: async (
-        id: number,
+        id: string | number,
         data: {
             user_id: string;
             user_name: string;

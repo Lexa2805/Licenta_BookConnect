@@ -1,8 +1,8 @@
 import { api } from "../api";
 
 export interface Review {
-    id: number;
-    listing: number;
+    id: string | number;
+    listing: string | number;
     user_id: string;
     user_name: string;
     rating: number;
@@ -11,7 +11,8 @@ export interface Review {
 }
 
 export interface Listing {
-    id: number;
+    id: string | number;
+    _id?: string;
     title: string;
     author: string;
     description: string;
@@ -49,7 +50,7 @@ export const marketplaceService = {
         return response.data;
     },
 
-    getListing: async (id: number): Promise<Listing> => {
+    getListing: async (id: string | number): Promise<Listing> => {
         const response = await api.get(`/api/marketplace/listings/${id}/`);
         return response.data;
     },
@@ -76,12 +77,12 @@ export const marketplaceService = {
     },
 
     // Reviews
-    getReviews: async (listingId: number): Promise<Review[]> => {
+    getReviews: async (listingId: string | number): Promise<Review[]> => {
         const response = await api.get(`/api/marketplace/reviews/?listing_id=${listingId}`);
         return response.data;
     },
 
-    createReview: async (data: { listing: number; user_id: string; user_name: string; rating: number; comment: string }): Promise<Review> => {
+    createReview: async (data: { listing: string | number; user_id: string; user_name: string; rating: number; comment: string }): Promise<Review> => {
         const response = await api.post("/api/marketplace/reviews/", data);
         return response.data;
     },

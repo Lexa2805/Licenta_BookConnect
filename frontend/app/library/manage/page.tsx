@@ -159,8 +159,8 @@ export default function BookManagePage() {
         try {
             const data = await libraryService.getBooks();
             setBooks(data);
-        } catch {
-            showToast("Failed to load books", "error");
+        } catch (err) {
+            showToast(getErrorMessage(err, "Failed to load books"), "error");
         } finally {
             setLoading(false);
         }
@@ -170,6 +170,9 @@ export default function BookManagePage() {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3500);
     };
+
+    const getErrorMessage = (err: unknown, fallback: string) =>
+        err instanceof Error ? err.message : fallback;
 
     const filtered = useMemo(() => {
         const q = searchQuery.toLowerCase();
@@ -249,8 +252,8 @@ export default function BookManagePage() {
             }
             closePanel();
             loadBooks();
-        } catch {
-            showToast("Failed to save book. Please try again.", "error");
+        } catch (err) {
+            showToast(getErrorMessage(err, "Failed to save book. Please try again."), "error");
         } finally {
             setSaving(false);
         }
@@ -264,8 +267,8 @@ export default function BookManagePage() {
             showToast(`"${deleteTarget.title}" deleted`);
             setDeleteTarget(null);
             loadBooks();
-        } catch {
-            showToast("Failed to delete book", "error");
+        } catch (err) {
+            showToast(getErrorMessage(err, "Failed to delete book"), "error");
         }
     };
 

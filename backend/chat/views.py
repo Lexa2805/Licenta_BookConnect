@@ -1,185 +1,146 @@
-from rest_framework import viewsets, status
+import logging
+
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
-from django.db.models import Q, Count
-from .models import ChatGroup, GroupMember, Message
-from .serializers import ChatGroupSerializer, GroupMemberSerializer, MessageSerializer
+
+from upload_storage import save_uploaded_file
+from . import mongo_service
 
 
-def build_message_preview(message):
-    content = (message.content or '').strip()
-    if content:
-        return content[:50] + ('...' if len(content) > 50 else '')
+logger = logging.getLogger(__name__)
 
-    if message.attachment:
-        if (message.attachment_type or '').startswith('image/'):
-            return 'Shared a photo'
-        if message.attachment_name:
-            return f"Shared {message.attachment_name[:40]}"
-        return 'Shared an attachment'
 
-    return ''
+def _log_request_payload(prefix, request):
+    files = {
+        name: {
+            "name": uploaded_file.name,
+            "size": uploaded_file.size,
+            "content_type": getattr(uploaded_file, "content_type", ""),
+        }
+        for name, uploaded_file in request.FILES.items()
+    }
+    logger.info("%s fields=%s files=%s", prefix, list(request.data.keys()), files)
 
-class ChatGroupViewSet(viewsets.ModelViewSet):
-    queryset = ChatGroup.objects.all()
-    serializer_class = ChatGroupSerializer
 
-    def get_queryset(self):
-        queryset = ChatGroup.objects.annotate(
-            member_count=Count('members')
-        ).order_by('-created_at')
-        return queryset
+class ChatGroupViewSet(viewsets.ViewSet):
+    parser_classes = [FormParser, JSONParser]
 
-    def perform_create(self, serializer):
-        # Save the group with created_by
-        created_by = self.request.data.get('created_by', '')
-        group = serializer.save(created_by=created_by)
-        # Auto-join creator to the group
-        if created_by:
-            GroupMember.objects.get_or_create(group=group, user_id=created_by)
+    def list(self, request):
+        return Response(mongo_service.list_groups())
 
-    @action(detail=False, methods=['get'])
-    def my_groups(self, request):
-        """Get groups the user is a member of"""
-        user_id = request.query_params.get('user_id')
-        if not user_id:
-            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        groups = ChatGroup.objects.filter(
-            members__user_id=user_id
-        ).annotate(
-            member_count=Count('members')
-        ).order_by('-created_at')
-        
-        # Get last message for each group
-        result = []
-        for group in groups:
-            last_msg = Message.objects.filter(group=group).order_by('-timestamp').first()
-            group_data = ChatGroupSerializer(group).data
-            group_data['member_count'] = group.member_count
-            group_data['is_member'] = True
-            if last_msg:
-                group_data['last_message'] = build_message_preview(last_msg)
-                group_data['last_message_time'] = last_msg.timestamp.isoformat()
-            result.append(group_data)
-        
-        return Response(result)
+    def retrieve(self, request, pk=None):
+        group = mongo_service.get_group(pk)
+        if not group:
+            return Response({"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(group)
 
-    @action(detail=True, methods=['post'])
-    def join(self, request, pk=None):
-        group = self.get_object()
-        user_id = request.data.get('user_id')
-        if not user_id:
-            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        member, created = GroupMember.objects.get_or_create(group=group, user_id=user_id)
-        if created:
-            return Response({'status': 'joined group'})
-        return Response({'status': 'already a member'})
-
-    @action(detail=True, methods=['post'])
-    def leave(self, request, pk=None):
-        group = self.get_object()
-        user_id = request.data.get('user_id')
-        if not user_id:
-            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        deleted, _ = GroupMember.objects.filter(group=group, user_id=user_id).delete()
-        if deleted:
-            return Response({'status': 'left group'})
-        return Response({'status': 'not a member'}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=True, methods=['get'])
-    def members(self, request, pk=None):
-        group = self.get_object()
-        members = GroupMember.objects.filter(group=group).order_by('joined_at')
-        serializer = GroupMemberSerializer(members, many=True)
-        return Response(serializer.data)
-
-class MessageViewSet(viewsets.ModelViewSet):
-    queryset = Message.objects.all()
-    serializer_class = MessageSerializer
-    parser_classes = (MultiPartParser, FormParser, JSONParser)
-
-    def perform_create(self, serializer):
-        sender_id = self.request.data.get('sender_id', 'anonymous_sender')
-        sender_name = self.request.data.get('sender_name', 'Anonymous')
-        receiver_name = self.request.data.get('receiver_name', '')
-        attachment = self.request.FILES.get('attachment')
-        attachment_name = self.request.data.get('attachment_name', '')
-        attachment_type = self.request.data.get('attachment_type', '')
-        attachment_size = self.request.data.get('attachment_size')
-
-        if attachment:
-            attachment_name = attachment_name or attachment.name
-            attachment_type = attachment_type or getattr(attachment, 'content_type', '')
-            attachment_size = attachment_size or getattr(attachment, 'size', None)
+    def create(self, request):
+        _log_request_payload("chat.group.create", request)
+        if not request.data.get("name"):
+            logger.warning("chat.group.create validation_errors=%s", {"name": "This field is required."})
+            return Response({"name": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            attachment_size = int(attachment_size) if attachment_size else None
-        except (TypeError, ValueError):
-            attachment_size = None
+            group, inserted_id = mongo_service.create_group(request.data)
+            logger.info("chat.group.create inserted_mongodb_id=%s", inserted_id)
+            return Response(group, status=status.HTTP_201_CREATED)
+        except Exception as exc:
+            logger.exception("chat.group.create validation_or_insert_error=%s", exc)
+            return Response({"detail": "Failed to save chat group in MongoDB."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        serializer.save(
-            sender_id=sender_id,
-            sender_name=sender_name,
-            receiver_name=receiver_name,
-            attachment_name=attachment_name,
-            attachment_type=attachment_type,
-            attachment_size=attachment_size,
+    def update(self, request, pk=None):
+        return self._update(request, pk)
+
+    def partial_update(self, request, pk=None):
+        return self._update(request, pk)
+
+    def _update(self, request, pk=None):
+        _log_request_payload("chat.group.update", request)
+        group = mongo_service.update_group(pk, request.data)
+        if not group:
+            return Response({"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(group)
+
+    def destroy(self, request, pk=None):
+        if not mongo_service.delete_group(pk):
+            return Response({"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"])
+    def my_groups(self, request):
+        user_id = request.query_params.get("user_id")
+        if not user_id:
+            return Response({"error": "user_id required"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(mongo_service.list_my_groups(user_id))
+
+    @action(detail=True, methods=["post"])
+    def join(self, request, pk=None):
+        user_id = request.data.get("user_id")
+        if not user_id:
+            return Response({"error": "user_id required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        member, created = mongo_service.join_group(pk, user_id)
+        if created:
+            logger.info("chat.group.join inserted_mongodb_id=%s", member.get("id"))
+            return Response({"status": "joined group"})
+        return Response({"status": "already a member"})
+
+    @action(detail=True, methods=["post"])
+    def leave(self, request, pk=None):
+        user_id = request.data.get("user_id")
+        if not user_id:
+            return Response({"error": "user_id required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if mongo_service.leave_group(pk, user_id):
+            return Response({"status": "left group"})
+        return Response({"status": "not a member"}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["get"])
+    def members(self, request, pk=None):
+        if not mongo_service.get_group(pk):
+            return Response({"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(mongo_service.list_members(pk))
+
+
+class MessageViewSet(viewsets.ViewSet):
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def list(self, request):
+        return Response(
+            mongo_service.list_messages(
+                group_id=request.query_params.get("group_id"),
+                receiver_id=request.query_params.get("receiver_id"),
+                sender_id=request.query_params.get("sender_id"),
+            )
         )
 
-    def get_queryset(self):
-        # Filter messages by group or receiver
-        group_id = self.request.query_params.get('group_id')
-        receiver_id = self.request.query_params.get('receiver_id')
-        sender_id = self.request.query_params.get('sender_id')
+    def create(self, request):
+        _log_request_payload("chat.message.create", request)
+        attachment = request.FILES.get("attachment")
+        content = (request.data.get("content") or "").strip()
 
-        queryset = self.queryset
-        if group_id:
-            queryset = queryset.filter(group_id=group_id)
-        elif receiver_id and sender_id:
-            # DM logic: messages between sender and receiver
-            queryset = queryset.filter(
-                Q(sender_id=sender_id, receiver_id=receiver_id) | 
-                Q(sender_id=receiver_id, receiver_id=sender_id)
-            ).filter(group__isnull=True)
-        
-        return queryset.order_by('timestamp')
+        if not content and not attachment:
+            logger.warning("chat.message.create validation_errors=%s", {"detail": "A message must include text or an attachment."})
+            return Response({"detail": "A message must include text or an attachment."}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=['get'])
+        try:
+            attachment_info = None
+            if attachment:
+                attachment_info = save_uploaded_file(attachment, "chat/attachments", request)
+                logger.info("chat.message.create saved_file_path=%s", attachment_info["path"])
+
+            message, inserted_id = mongo_service.create_message(request.data, attachment_info=attachment_info)
+            logger.info("chat.message.create inserted_mongodb_id=%s", inserted_id)
+            return Response(message, status=status.HTTP_201_CREATED)
+        except Exception as exc:
+            logger.exception("chat.message.create validation_or_insert_error=%s", exc)
+            return Response({"detail": "Failed to save chat message in MongoDB."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=["get"])
     def conversations(self, request):
-        """Get all DM conversations for a user"""
-        user_id = request.query_params.get('user_id')
+        user_id = request.query_params.get("user_id")
         if not user_id:
-            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get all messages where user is sender or receiver (DMs only)
-        messages = Message.objects.filter(
-            Q(sender_id=user_id) | Q(receiver_id=user_id),
-            group__isnull=True
-        ).order_by('-timestamp')
-        
-        # Build unique conversations
-        conversations = {}
-        for msg in messages:
-            # Determine the other participant
-            if msg.sender_id == user_id:
-                other_id = msg.receiver_id
-                other_name = msg.receiver_name or 'Unknown'
-            else:
-                other_id = msg.sender_id
-                other_name = msg.sender_name or 'Unknown'
-            
-            if other_id and other_id not in conversations:
-                conversations[other_id] = {
-                    'id': other_id,
-                    'participant_id': other_id,
-                    'participant_name': other_name,
-                    'last_message': build_message_preview(msg),
-                    'last_message_time': msg.timestamp.isoformat(),
-                    'unread_count': 0  # Could be implemented with is_read field
-                }
-        
-        return Response(list(conversations.values()))
+            return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(mongo_service.list_conversations(user_id))

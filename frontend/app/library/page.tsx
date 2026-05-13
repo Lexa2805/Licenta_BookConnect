@@ -37,15 +37,15 @@ export default function LibraryPage() {
   });
 
   const userEntryByBookId = useMemo(() => {
-    return new Map<number, UserLibraryEntry>(userLibrary.map((e) => [e.book.id, e]));
+    return new Map<string, UserLibraryEntry>(userLibrary.map((e) => [String(e.book.id), e]));
   }, [userLibrary]);
 
   const toggleWishlistMutation = useMutation({
-    mutationFn: async (bookId: number) => {
+    mutationFn: async (bookId: string | number) => {
       const userId = session?.user?.id as string | undefined;
       if (!userId) throw new Error("Not authenticated");
 
-      const existing = userEntryByBookId.get(bookId);
+      const existing = userEntryByBookId.get(String(bookId));
       if (existing) {
         return await libraryService.toggleFavorite(existing.id);
       }
@@ -72,7 +72,12 @@ export default function LibraryPage() {
 
   const isLoading = loadingBooks || loadingLibrary;
 
-  const getGradientForBook = (id: number) => {
+  const getGradientSeed = (id: string | number) => {
+    if (typeof id === "number") return id;
+    return String(id).split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  };
+
+  const getGradientForBook = (id: string | number) => {
     const gradients = [
       "linear-gradient(135deg, #1B2638, #3B4860)",
       "linear-gradient(135deg, #7C3F22, #B26845)",
@@ -82,7 +87,7 @@ export default function LibraryPage() {
       "linear-gradient(135deg, #5C3A21, #8B5A33)",
       "linear-gradient(135deg, #4B2A3B, #7A4A5C)",
     ];
-    return gradients[id % gradients.length];
+    return gradients[getGradientSeed(id) % gradients.length];
   };
 
   // Map backend status to UI filter
@@ -92,7 +97,7 @@ export default function LibraryPage() {
     // Show all available books from admin catalog
     displayBooks = allBooks.map(book => {
       // Check if user has this book in their library to show status badge
-      const userEntry = userLibrary.find(entry => entry.book.id === book.id);
+      const userEntry = userLibrary.find(entry => String(entry.book.id) === String(book.id));
       return {
         id: book.id,
         title: book.title,
@@ -199,7 +204,7 @@ export default function LibraryPage() {
               coverUrl={book.cover_url}
               badge={book.status === "FINISHED" ? "Finished" : undefined}
               meta={book.meta}
-              isWishlisted={!!(userEntryByBookId.get(book.id)?.is_favorite ?? book.isWishlisted)}
+              isWishlisted={!!(userEntryByBookId.get(String(book.id))?.is_favorite ?? book.isWishlisted)}
               onToggleWishlist={
                 session?.user?.id
                   ? () => toggleWishlistMutation.mutate(book.id)

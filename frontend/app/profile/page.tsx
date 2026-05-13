@@ -36,7 +36,12 @@ export default function ProfilePage() {
     { id: "s4", label: "Reading", value: readingBooks.length.toString() },
   ];
 
-  const getGradientForBook = (id: number) => {
+  const getGradientSeed = (id: string | number) => {
+    if (typeof id === "number") return id;
+    return String(id).split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  };
+
+  const getGradientForBook = (id: string | number) => {
     const gradients = [
       "linear-gradient(135deg, #1B2638, #3B4860)",
       "linear-gradient(135deg, #7C3F22, #B26845)",
@@ -46,7 +51,7 @@ export default function ProfilePage() {
       "linear-gradient(135deg, #5C3A21, #8B5A33)",
       "linear-gradient(135deg, #4B2A3B, #7A4A5C)",
     ];
-    return gradients[id % gradients.length];
+    return gradients[getGradientSeed(id) % gradients.length];
   };
 
   return (

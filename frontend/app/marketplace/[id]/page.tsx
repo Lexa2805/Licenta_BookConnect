@@ -34,7 +34,7 @@ export default function BookDetailPage() {
     const params = useParams();
     const router = useRouter();
     const { data: session } = useSession();
-    const id = Number(params.id);
+    const id = String(params.id);
 
     const [listing, setListing] = useState<Listing | null>(null);
     const [loading, setLoading] = useState(true);
@@ -57,7 +57,7 @@ export default function BookDetailPage() {
         if (!id) return;
 
         try {
-            const saved = JSON.parse(localStorage.getItem("bookconnect-marketplace-wishlist") || "[]") as number[];
+            const saved = JSON.parse(localStorage.getItem("bookconnect-marketplace-wishlist") || "[]") as string[];
             setIsWishlisted(saved.includes(id));
         } catch {
             setIsWishlisted(false);
@@ -162,12 +162,13 @@ export default function BookDetailPage() {
         if (!listing) return;
 
         try {
-            const saved = JSON.parse(localStorage.getItem("bookconnect-marketplace-wishlist") || "[]") as number[];
-            const next = saved.includes(listing.id)
-                ? saved.filter((itemId) => itemId !== listing.id)
-                : [listing.id, ...saved];
+            const saved = JSON.parse(localStorage.getItem("bookconnect-marketplace-wishlist") || "[]") as string[];
+            const listingId = String(listing.id);
+            const next = saved.includes(listingId)
+                ? saved.filter((itemId) => itemId !== listingId)
+                : [listingId, ...saved];
             localStorage.setItem("bookconnect-marketplace-wishlist", JSON.stringify(next));
-            setIsWishlisted(next.includes(listing.id));
+            setIsWishlisted(next.includes(listingId));
         } catch {
             alert("Could not update wishlist. Please try again.");
         }

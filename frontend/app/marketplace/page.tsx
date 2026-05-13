@@ -23,7 +23,12 @@ export default function MarketplacePage() {
     queryFn: () => marketplaceService.getListings(),
   });
 
-  const getGradientForBook = (id: number) => {
+  const getGradientSeed = (id: string | number) => {
+    if (typeof id === "number") return id;
+    return String(id).split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  };
+
+  const getGradientForBook = (id: string | number) => {
     const gradients = [
       "linear-gradient(135deg, #1E3B4D, #4A6B7C)",
       "linear-gradient(135deg, #D45B4B, #E68A7C)",
@@ -32,7 +37,7 @@ export default function MarketplacePage() {
       "linear-gradient(135deg, #2B2C30, #5B5C62)",
       "linear-gradient(135deg, #4B2A3B, #7A4A5C)",
     ];
-    return gradients[id % gradients.length];
+    return gradients[getGradientSeed(id) % gradients.length];
   };
 
   const filteredListings = listings.filter((book) => {

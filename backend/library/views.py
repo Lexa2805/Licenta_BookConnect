@@ -1,19 +1,64 @@
+import logging
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from django.db.models import Q
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.views.decorators.http import require_POST
-from django.utils import timezone
-from datetime import timedelta
-from .models import LibraryBook, UserLibrary, Bookmark, ReadingSession
-from .serializers import (
-    LibraryBookSerializer, UserLibrarySerializer,
-    BookmarkSerializer, ReadingSessionSerializer
-)
 from .forms import LibraryBookForm
+from . import mongo_service
+from upload_storage import save_uploaded_file
+
+
+logger = logging.getLogger(__name__)
+
+
+class FileRef:
+    def __init__(self, url=None, path=None):
+        self.url = url
+        self.name = path or ""
+
+    def __bool__(self):
+        return bool(self.url or self.name)
+
+
+class TemplateBook:
+    def __init__(self, data):
+        self.data = data
+        for key, value in data.items():
+            setattr(self, key, value)
+        self.pk = data.get("id")
+        self.cover_image = FileRef(data.get("cover_url"), data.get("cover_path"))
+        self.pdf_file = FileRef(data.get("pdf_url"), data.get("pdf_path"))
+
+
+def _log_request_payload(prefix, request):
+    files = {
+        name: {
+            "name": uploaded_file.name,
+            "size": uploaded_file.size,
+            "content_type": getattr(uploaded_file, "content_type", ""),
+        }
+        for name, uploaded_file in request.FILES.items()
+    }
+    data = getattr(request, "data", {})
+    logger.info("%s fields=%s files=%s", prefix, list(request.POST.keys()) or list(data.keys()), files)
+
+
+def _save_library_uploads(request):
+    cover_info = None
+    pdf_info = None
+    cover_file = request.FILES.get("cover_image")
+    pdf_file = request.FILES.get("pdf_file")
+    if cover_file:
+        cover_info = save_uploaded_file(cover_file, "library/covers", request)
+        logger.info("library.book saved_cover_path=%s", cover_info["path"])
+    if pdf_file:
+        pdf_info = save_uploaded_file(pdf_file, "library/pdfs", request)
+        logger.info("library.book saved_pdf_path=%s", pdf_info["path"])
+    return cover_info, pdf_info
 
 
 # ---------------------------------------------------------------------------
@@ -23,15 +68,11 @@ from .forms import LibraryBookForm
 def book_manage_list(request):
     """List all books with search; accessible at /manage/books/"""
     search = request.GET.get("q", "").strip()
-    books = LibraryBook.objects.all()
-    if search:
-        books = books.filter(
-            Q(title__icontains=search) | Q(author__icontains=search)
-        )
+    books = [TemplateBook(book) for book in mongo_service.list_books({"search": search} if search else {})]
     return render(request, "library/manage_list.html", {
         "books": books,
         "search": search,
-        "total": LibraryBook.objects.count(),
+        "total": len(mongo_service.list_books()),
     })
 
 
@@ -40,9 +81,12 @@ def book_manage_create(request):
     if request.method == "POST":
         form = LibraryBookForm(request.POST, request.FILES)
         if form.is_valid():
-            form.save()
+            _log_request_payload("library.manage.create", request)
+            cover_info, pdf_info = _save_library_uploads(request)
+            book, inserted_id = mongo_service.create_book(form.cleaned_data, cover_info=cover_info, pdf_info=pdf_info)
+            logger.info("library.manage.create inserted_mongodb_id=%s", inserted_id)
             messages.success(request, "Book added successfully!")
-            return redirect("book-manage-list")
+            return redirect("library_manage:list")
     else:
         form = LibraryBookForm()
     return render(request, "library/manage_form.html", {
@@ -54,19 +98,24 @@ def book_manage_create(request):
 
 def book_manage_edit(request, pk):
     """Edit an existing book."""
-    book = get_object_or_404(LibraryBook, pk=pk)
+    book = mongo_service.get_book(pk)
+    if not book:
+        messages.error(request, "Book not found.")
+        return redirect("library_manage:list")
     if request.method == "POST":
-        form = LibraryBookForm(request.POST, request.FILES, instance=book)
+        form = LibraryBookForm(request.POST, request.FILES)
         if form.is_valid():
-            form.save()
-            messages.success(request, f'"{book.title}" updated successfully!')
-            return redirect("book-manage-list")
+            _log_request_payload("library.manage.update", request)
+            cover_info, pdf_info = _save_library_uploads(request)
+            mongo_service.update_book(pk, form.cleaned_data, cover_info=cover_info, pdf_info=pdf_info)
+            messages.success(request, f'"{book.get("title")}" updated successfully!')
+            return redirect("library_manage:list")
     else:
-        form = LibraryBookForm(instance=book)
+        form = LibraryBookForm(initial=book)
     return render(request, "library/manage_form.html", {
         "form": form,
-        "book": book,
-        "action": f"Edit: {book.title}",
+        "book": TemplateBook(book),
+        "action": f"Edit: {book.get('title')}",
         "submit_label": "Save Changes",
     })
 
@@ -74,202 +123,218 @@ def book_manage_edit(request, pk):
 @require_POST
 def book_manage_delete(request, pk):
     """Delete a book (POST only)."""
-    book = get_object_or_404(LibraryBook, pk=pk)
-    title = book.title
-    book.delete()
+    book = mongo_service.get_book(pk)
+    if not book:
+        messages.error(request, "Book not found.")
+        return redirect("library_manage:list")
+    title = book.get("title")
+    mongo_service.delete_book(pk)
     messages.success(request, f'"{title}" has been deleted.')
-    return redirect("book-manage-list")
+    return redirect("library_manage:list")
 
 
-class LibraryBookViewSet(viewsets.ModelViewSet):
+class LibraryBookViewSet(viewsets.ViewSet):
     """
     ViewSet for managing library books (admin functionality).
     """
-    queryset = LibraryBook.objects.all()
-    serializer_class = LibraryBookSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-    
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context['request'] = self.request
-        return context
 
-    def get_queryset(self):
-        queryset = LibraryBook.objects.all()
-        
-        # Filter by search query
-        search = self.request.query_params.get('search')
-        if search:
-            queryset = queryset.filter(
-                Q(title__icontains=search) | 
-                Q(author__icontains=search) |
-                Q(description__icontains=search)
+    def list(self, request):
+        return Response(mongo_service.list_books(request.query_params))
+
+    def retrieve(self, request, pk=None):
+        book = mongo_service.get_book(pk)
+        if not book:
+            return Response({'detail': 'Book not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(book)
+
+    def create(self, request):
+        _log_request_payload("library.book.create", request)
+        if not request.data.get("title") or not request.data.get("author"):
+            errors = {'detail': 'Title and author are required.'}
+            logger.warning("library.book.create validation_errors=%s", errors)
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            cover_info, pdf_info = _save_library_uploads(request)
+            book, inserted_id = mongo_service.create_book(request.data, cover_info=cover_info, pdf_info=pdf_info)
+            logger.info("library.book.create inserted_mongodb_id=%s", inserted_id)
+            return Response(book, status=status.HTTP_201_CREATED)
+        except Exception as exc:
+            logger.exception("library.book.create validation_or_insert_error=%s", exc)
+            return Response(
+                {'detail': 'Failed to save library book in MongoDB.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        
-        # Filter by genre (icontains works on SQLite; __contains only works on PostgreSQL)
-        genre = self.request.query_params.get('genre')
-        if genre:
-            queryset = queryset.filter(genres__icontains=genre)
-        
-        # Filter by featured
-        featured = self.request.query_params.get('featured')
-        if featured == 'true':
-            queryset = queryset.filter(is_featured=True)
-        
-        # Filter by free
-        is_free = self.request.query_params.get('is_free')
-        if is_free == 'true':
-            queryset = queryset.filter(is_free=True)
-        
-        return queryset
+
+    def update(self, request, pk=None):
+        return self._update(request, pk)
+
+    def partial_update(self, request, pk=None):
+        return self._update(request, pk)
+
+    def _update(self, request, pk=None):
+        _log_request_payload("library.book.update", request)
+        try:
+            cover_info, pdf_info = _save_library_uploads(request)
+            book = mongo_service.update_book(pk, request.data, cover_info=cover_info, pdf_info=pdf_info)
+            if not book:
+                return Response({'detail': 'Book not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(book)
+        except Exception as exc:
+            logger.exception("library.book.update validation_or_insert_error=%s", exc)
+            return Response(
+                {'detail': 'Failed to update library book in MongoDB.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def destroy(self, request, pk=None):
+        if not mongo_service.delete_book(pk):
+            return Response({'detail': 'Book not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'])
     def toggle_featured(self, request, pk=None):
         """Toggle featured status of a book"""
-        book = self.get_object()
-        book.is_featured = not book.is_featured
-        book.save()
-        serializer = self.get_serializer(book)
-        return Response(serializer.data)
+        book = mongo_service.toggle_featured(pk)
+        if not book:
+            return Response({'detail': 'Book not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(book)
 
 
-class UserLibraryViewSet(viewsets.ModelViewSet):
+class UserLibraryViewSet(viewsets.ViewSet):
     """
     ViewSet for managing user's personal library.
     """
-    serializer_class = UserLibrarySerializer
+    parser_classes = [FormParser, JSONParser]
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context['request'] = self.request
-        return context
+    def list(self, request):
+        return Response(
+            mongo_service.list_user_library(
+                user_id=request.query_params.get('user_id'),
+                status=request.query_params.get('status'),
+                favorites=request.query_params.get('favorites') == 'true',
+            )
+        )
 
-    def get_queryset(self):
-        queryset = UserLibrary.objects.all()
-        user_id = self.request.query_params.get('user_id')
-        if user_id:
-            queryset = queryset.filter(user_id=user_id)
-        
-        # Filter by status
-        reading_status = self.request.query_params.get('status')
-        if reading_status:
-            queryset = queryset.filter(status=reading_status)
-        
-        # Filter favorites
-        favorites = self.request.query_params.get('favorites')
-        if favorites == 'true':
-            queryset = queryset.filter(is_favorite=True)
-        
-        return queryset
+    def retrieve(self, request, pk=None):
+        entry = mongo_service.get_user_library_entry(pk)
+        if not entry:
+            return Response({'detail': 'Library entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(entry)
 
     def create(self, request, *args, **kwargs):
         user_id = request.data.get('user_id')
         book_id = request.data.get('book_id')
-        
-        # Check if already in library
-        existing = UserLibrary.objects.filter(user_id=user_id, book_id=book_id).first()
-        if existing:
-            serializer = self.get_serializer(existing)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        
-        return super().create(request, *args, **kwargs)
+
+        if not user_id or not book_id:
+            return Response({'detail': 'user_id and book_id are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        entry, created = mongo_service.create_user_library_entry(request.data)
+        return Response(entry, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def partial_update(self, request, pk=None):
+        entry = mongo_service.update_user_library_entry(pk, request.data)
+        if not entry:
+            return Response({'detail': 'Library entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(entry)
+
+    def update(self, request, pk=None):
+        return self.partial_update(request, pk)
+
+    def destroy(self, request, pk=None):
+        if not mongo_service.delete_user_library_entry(pk):
+            return Response({'detail': 'Library entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'])
     def toggle_favorite(self, request, pk=None):
         """Toggle favorite status"""
-        library_entry = self.get_object()
-        library_entry.is_favorite = not library_entry.is_favorite
-        library_entry.save()
-        serializer = self.get_serializer(library_entry)
-        return Response(serializer.data)
+        entry = mongo_service.get_user_library_entry(pk)
+        if not entry:
+            return Response({'detail': 'Library entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(mongo_service.update_user_library_entry(pk, {'is_favorite': not entry.get('is_favorite')}))
 
     @action(detail=True, methods=['post'])
     def update_progress(self, request, pk=None):
         """Update reading progress"""
-        library_entry = self.get_object()
         current_page = request.data.get('current_page', 0)
-        library_entry.current_page = current_page
-        
-        # Auto-update status based on progress
-        if library_entry.book.pages > 0:
-            if current_page >= library_entry.book.pages:
-                library_entry.status = 'FINISHED'
-            elif current_page > 0:
-                library_entry.status = 'READING'
-        
-        library_entry.save()
-        serializer = self.get_serializer(library_entry)
-        return Response(serializer.data)
+        entry = mongo_service.get_user_library_entry(pk)
+        if not entry:
+            return Response({'detail': 'Library entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+        status_update = entry.get('status')
+        pages = entry.get('book', {}).get('pages') or 0
+        try:
+            current_page_int = int(current_page)
+        except (TypeError, ValueError):
+            current_page_int = 0
+        if pages and current_page_int >= pages:
+            status_update = 'FINISHED'
+        elif current_page_int > 0:
+            status_update = 'READING'
+        return Response(mongo_service.update_user_library_entry(pk, {
+            'current_page': current_page_int,
+            'status': status_update,
+        }))
 
     @action(detail=True, methods=['post'])
     def rate(self, request, pk=None):
         """Rate a book"""
-        library_entry = self.get_object()
         rating = request.data.get('rating')
-        if rating and 1 <= rating <= 5:
-            library_entry.rating = rating
-            library_entry.save()
-        serializer = self.get_serializer(library_entry)
-        return Response(serializer.data)
+        try:
+            rating = int(rating)
+        except (TypeError, ValueError):
+            rating = None
+        if rating is None or not 1 <= rating <= 5:
+            return Response({'detail': 'rating must be between 1 and 5.'}, status=status.HTTP_400_BAD_REQUEST)
+        entry = mongo_service.update_user_library_entry(pk, {'rating': rating})
+        if not entry:
+            return Response({'detail': 'Library entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(entry)
 
 
-class BookmarkViewSet(viewsets.ModelViewSet):
+class BookmarkViewSet(viewsets.ViewSet):
     """
     ViewSet for managing bookmarks.
     """
-    serializer_class = BookmarkSerializer
+    parser_classes = [FormParser, JSONParser]
 
-    def get_queryset(self):
-        queryset = Bookmark.objects.all()
-        user_id = self.request.query_params.get('user_id')
-        book_id = self.request.query_params.get('book_id')
-        
-        if user_id:
-            queryset = queryset.filter(user_id=user_id)
-        if book_id:
-            queryset = queryset.filter(book_id=book_id)
-        
-        return queryset
+    def list(self, request):
+        return Response(
+            mongo_service.list_bookmarks(
+                user_id=request.query_params.get('user_id'),
+                book_id=request.query_params.get('book_id'),
+            )
+        )
+
+    def create(self, request):
+        bookmark, inserted_id = mongo_service.create_bookmark(request.data)
+        logger.info("library.bookmark.create inserted_mongodb_id=%s", inserted_id)
+        return Response(bookmark, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, pk=None):
+        if not mongo_service.delete_bookmark(pk):
+            return Response({'detail': 'Bookmark not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ReadingSessionViewSet(viewsets.ModelViewSet):
+class ReadingSessionViewSet(viewsets.ViewSet):
     """
     ViewSet for tracking reading sessions.
     """
-    serializer_class = ReadingSessionSerializer
+    parser_classes = [FormParser, JSONParser]
 
-    def get_queryset(self):
-        queryset = ReadingSession.objects.all()
-        user_id = self.request.query_params.get('user_id')
-        book_id = self.request.query_params.get('book_id')
-        
-        if user_id:
-            queryset = queryset.filter(user_id=user_id)
-        if book_id:
-            queryset = queryset.filter(book_id=book_id)
-        
-        return queryset
+    def create(self, request):
+        session, inserted_id = mongo_service.create_reading_session(request.data)
+        logger.info("library.reading_session.create inserted_mongodb_id=%s", inserted_id)
+        return Response(session, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
     def end_session(self, request, pk=None):
         """End a reading session"""
-        session = self.get_object()
-        session.ended_at = timezone.now()
-        session.end_page = request.data.get('end_page', session.start_page)
-        session.pages_read = session.end_page - session.start_page
-        session.save()
-        
-        # Update user library progress
-        user_library = UserLibrary.objects.filter(
-            user_id=session.user_id, 
-            book=session.book
-        ).first()
-        if user_library:
-            user_library.current_page = session.end_page
-            user_library.save()
-        
-        serializer = self.get_serializer(session)
-        return Response(serializer.data)
+        session = mongo_service.end_reading_session(pk, request.data.get('end_page'))
+        if not session:
+            return Response({'detail': 'Reading session not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(session)
 
     @action(detail=False, methods=['get'], url_path='streak')
     def streak(self, request):
@@ -277,26 +342,4 @@ class ReadingSessionViewSet(viewsets.ModelViewSet):
         user_id = request.query_params.get('user_id')
         if not user_id:
             return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Collect unique calendar days with at least one session start.
-        days = set(ReadingSession.objects.filter(user_id=user_id).dates('started_at', 'day'))
-        today = timezone.localdate()
-
-        # Streak counts consecutive days ending today; if not read today, allow ending yesterday.
-        cursor = today
-        if cursor not in days and (today - timedelta(days=1)) in days:
-            cursor = today - timedelta(days=1)
-
-        streak_days = 0
-        while cursor in days:
-            streak_days += 1
-            cursor = cursor - timedelta(days=1)
-
-        last_read_date = max(days).isoformat() if days else None
-
-        return Response({
-            'streak_days': streak_days,
-            'active_today': today in days,
-            'last_read_date': last_read_date,
-            'tracked_days': len(days),
-        })
+        return Response(mongo_service.reading_streak(user_id))

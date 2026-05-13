@@ -11,6 +11,6 @@ app_name = "library_manage"
 urlpatterns = [
     path("", book_manage_list, name="list"),
     path("add/", book_manage_create, name="create"),
-    path("<int:pk>/edit/", book_manage_edit, name="edit"),
-    path("<int:pk>/delete/", book_manage_delete, name="delete"),
+    path("<str:pk>/edit/", book_manage_edit, name="edit"),
+    path("<str:pk>/delete/", book_manage_delete, name="delete"),
 ]

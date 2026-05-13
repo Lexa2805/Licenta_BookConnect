@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react";
 export default function EditorPage() {
     const params = useParams();
     const router = useRouter();
-    const id = Number(params.id);
+    const id = String(params.id);
     const { data: session, status } = useSession();
     const userId = session?.user?.id as string | undefined;
 
@@ -22,7 +22,7 @@ export default function EditorPage() {
     useEffect(() => {
         if (status === "loading") return;
 
-        if (id && !Number.isNaN(id)) {
+        if (id) {
             const loadManuscript = userId
                 ? manuscriptsService.getManuscript(id, userId).catch(() => manuscriptsService.getManuscript(id))
                 : manuscriptsService.getManuscript(id);

@@ -1,3 +1,5 @@
+import json
+
 from rest_framework import serializers
 from .models import LibraryBook, UserLibrary, Bookmark, ReadingSession
 
@@ -14,6 +16,18 @@ class LibraryBookSerializer(serializers.ModelSerializer):
                   'year_published', 'is_free', 'is_featured', 'created_at', 'updated_at',
                   'cover', 'pdf']
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def to_internal_value(self, data):
+        mutable_data = data.copy()
+        genres = mutable_data.get('genres')
+        if isinstance(genres, str):
+            try:
+                parsed_genres = json.loads(genres)
+            except json.JSONDecodeError:
+                parsed_genres = [genre.strip() for genre in genres.split(',') if genre.strip()]
+            if isinstance(parsed_genres, list):
+                mutable_data['genres'] = parsed_genres
+        return super().to_internal_value(mutable_data)
     
     def get_cover(self, obj):
         """Returns the cover URL - either from uploaded file or URL field"""

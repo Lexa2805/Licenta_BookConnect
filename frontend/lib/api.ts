@@ -45,7 +45,14 @@ async function request<T>(
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => res.statusText);
-    throw new Error(`HTTP ${res.status}: ${errorText}`);
+    let message = errorText || res.statusText;
+    try {
+      const parsed = JSON.parse(errorText) as { detail?: string; error?: string };
+      message = parsed.detail || parsed.error || errorText;
+    } catch {
+      message = errorText || res.statusText;
+    }
+    throw new Error(`HTTP ${res.status}: ${message}`);
   }
 
   if (res.status === 204) {

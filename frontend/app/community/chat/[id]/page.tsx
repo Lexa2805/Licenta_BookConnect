@@ -7,7 +7,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 interface Message {
-    id: number;
+    id: string | number;
     sender_id: string;
     sender_name?: string;
     content: string;
@@ -17,7 +17,7 @@ interface Message {
 export default function GroupChatPage() {
     const params = useParams();
     const { data: session } = useSession();
-    const groupId = Number(params.id);
+    const groupId = String(params.id);
 
     const [group, setGroup] = useState<ChatGroup | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);

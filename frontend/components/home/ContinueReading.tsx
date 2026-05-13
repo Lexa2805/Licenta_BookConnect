@@ -8,7 +8,12 @@ import { BookCover } from "../books/BookCover";
 import { SectionHeader } from "../ui/SectionTitle";
 import { libraryService } from "@/lib/services/library";
 
-function getGradientForBook(id: number) {
+function getGradientSeed(id: string | number) {
+  if (typeof id === "number") return id;
+  return String(id).split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+}
+
+function getGradientForBook(id: string | number) {
   const gradients = [
     "linear-gradient(135deg, #1B2638, #3B4860)",
     "linear-gradient(135deg, #7C3F22, #B26845)",
@@ -18,7 +23,7 @@ function getGradientForBook(id: number) {
     "linear-gradient(135deg, #5C3A21, #8B5A33)",
     "linear-gradient(135deg, #4B2A3B, #7A4A5C)",
   ];
-  return gradients[id % gradients.length];
+  return gradients[getGradientSeed(id) % gradients.length];
 }
 
 export function ContinueReading() {

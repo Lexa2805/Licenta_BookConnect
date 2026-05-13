@@ -68,6 +68,8 @@ export default function StudioPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const userId = session?.user?.id as string | undefined;
+  const manuscriptUploadRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingManuscript, setUploadingManuscript] = useState(false);
 
   const { data: manuscripts = [], isLoading: loadingManuscripts, refetch: refetchManuscripts } = useQuery({
     queryKey: ["manuscripts", userId],
@@ -85,9 +87,17 @@ export default function StudioPage() {
   const draftManuscripts = manuscripts.filter((m: any) => m.status === "draft" || m.status === "DRAFT");
   
   const totalListings = myListings.length;
-  const activeListings = myListings.filter((l: any) => l.status === "AVAILABLE" || l.status === "available").length;
+  const activeListings = myListings.filter((l: any) => l.status === "LISTED" || l.status === "listed" || l.status === "AVAILABLE" || l.status === "available").length;
   
   const loading = loadingManuscripts || loadingListings;
+
+  function getErrorMessage(err: unknown, fallback: string) {
+    return err instanceof Error ? err.message : fallback;
+  }
+
+  function getTitleFromFileName(fileName: string) {
+    return fileName.replace(/\.[^/.]+$/, "").trim() || "Untitled manuscript";
+  }
 
   async function handleNewManuscript() {
     if (!userId) {
@@ -102,10 +112,50 @@ export default function StudioPage() {
         author_id: userId,
         status: "DRAFT",
       });
+      await refetchManuscripts();
       router.push(`/studio/editor/${manuscript.id}`);
     } catch (err) {
       console.error(err);
-      alert("Failed to create manuscript.");
+      alert(getErrorMessage(err, "Failed to create manuscript."));
+    }
+  }
+
+  async function handleManuscriptUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (!userId) {
+      alert("Please sign in before uploading a manuscript.");
+      return;
+    }
+
+    setUploadingManuscript(true);
+
+    try {
+      const data = new FormData();
+      data.append("title", getTitleFromFileName(file.name));
+      data.append("author_id", userId);
+      data.append("status", "DRAFT");
+      data.append("file", file);
+
+      if (file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt")) {
+        data.append("content", await file.text());
+      } else {
+        data.append("content", "");
+      }
+
+      const manuscript = await manuscriptsService.createManuscript(data);
+      await refetchManuscripts();
+      router.push(`/studio/editor/${manuscript.id}`);
+    } catch (err) {
+      console.error(err);
+      alert(getErrorMessage(err, "Failed to upload manuscript."));
+    } finally {
+      setUploadingManuscript(false);
     }
   }
 
@@ -134,7 +184,22 @@ export default function StudioPage() {
       pageSubtitle="Shape ideas with AI, then manage your listings, swaps, earnings, and self-published works."
       headerActions={
         <>
+          <input
+            ref={manuscriptUploadRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt,.rtf,.odt"
+            onChange={handleManuscriptUpload}
+            className="hidden"
+          />
           <Button variant="secondary" onClick={() => router.push("/marketplace/create")}>New Listing</Button>
+          <Button
+            variant="secondary"
+            leftIcon={uploadingManuscript ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload size={15} />}
+            disabled={uploadingManuscript}
+            onClick={() => manuscriptUploadRef.current?.click()}
+          >
+            Upload Manuscript
+          </Button>
           <Button leftIcon={<Plus size={15} />} onClick={handleNewManuscript}>New Manuscript</Button>
         </>
       }
@@ -218,6 +283,17 @@ export default function StudioPage() {
                     <div className="text-[12.5px] text-bc-subtext flex items-center gap-2">
                       <span className={`inline-block w-2 h-2 rounded-full ${m.status === "PUBLISHED" ? "bg-bc-success" : "bg-bc-warning"}`}></span>
                       {m.status === "PUBLISHED" ? "Public" : "Private"}
+                      {m.file_url && (
+                        <a
+                          href={m.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(event) => event.stopPropagation()}
+                          className="font-semibold text-bc-primary hover:underline"
+                        >
+                          File
+                        </a>
+                      )}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">

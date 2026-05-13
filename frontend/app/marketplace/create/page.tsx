@@ -4,6 +4,7 @@ import { useState } from "react";
 import { marketplaceService } from "@/lib/services/marketplace";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -44,6 +45,7 @@ const LANGUAGES = [
 export default function CreateListingPage() {
     const router = useRouter();
     const { data: session } = useSession();
+    const queryClient = useQueryClient();
 
     const [formData, setFormData] = useState({
         title: "",
@@ -81,6 +83,12 @@ export default function CreateListingPage() {
         setError(null);
         setLoading(true);
 
+        if (!session?.user?.id) {
+            setError("Please sign in before creating a listing.");
+            setLoading(false);
+            return;
+        }
+
         const data = new FormData();
         data.append("title", formData.title);
         data.append("author", formData.author);
@@ -90,8 +98,8 @@ export default function CreateListingPage() {
         data.append("pages", formData.pages || "0");
         data.append("price", formData.price);
         data.append("condition", formData.condition);
-        data.append("seller_id", session?.user?.id || "anonymous");
-        data.append("seller_name", session?.user?.username || "Anonymous Seller");
+        data.append("seller_id", session.user.id);
+        data.append("seller_name", session.user.username || session.user.email || "Anonymous Seller");
 
         if (imageFile) {
             data.append("image", imageFile);
@@ -99,13 +107,12 @@ export default function CreateListingPage() {
 
         try {
             await marketplaceService.createListing(data);
+            await queryClient.invalidateQueries({ queryKey: ["marketplace-listings"] });
+            await queryClient.invalidateQueries({ queryKey: ["my-listings", session.user.id] });
             router.push("/marketplace");
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            const errorMsg = err.response?.data
-                ? JSON.stringify(err.response.data)
-                : "Failed to create listing. Please try again.";
-            setError(errorMsg);
+            setError(err instanceof Error ? err.message : "Failed to create listing. Please try again.");
         } finally {
             setLoading(false);
         }

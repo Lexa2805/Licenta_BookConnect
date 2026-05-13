@@ -20,7 +20,8 @@ function sanitizeTextInput(
 }
 
 export interface LibraryBook {
-    id: number;
+    id: string | number;
+    _id?: string;
     title: string;
     author: string;
     description: string;
@@ -58,10 +59,10 @@ export interface CreateBookData {
 }
 
 export interface UserLibraryEntry {
-    id: number;
+    id: string | number;
     user_id: string;
     book: LibraryBook;
-    book_id?: number;
+    book_id?: string | number;
     status: 'WANT_TO_READ' | 'READING' | 'FINISHED';
     is_favorite: boolean;
     current_page: number;
@@ -72,9 +73,9 @@ export interface UserLibraryEntry {
 }
 
 export interface Bookmark {
-    id: number;
+    id: string | number;
     user_id: string;
-    book: number;
+    book: string | number;
     page_number: number;
     paragraph_text: string;
     note: string;
@@ -102,7 +103,7 @@ export const libraryService = {
         return response.data as LibraryBook[];
     },
 
-    getBook: async (id: number) => {
+    getBook: async (id: string | number) => {
         const response = await api.get(`/api/library/books/${id}/`);
         return response.data as LibraryBook;
     },
@@ -127,7 +128,7 @@ export const libraryService = {
         return response.data as LibraryBook;
     },
 
-    updateBook: async (id: number, data: Partial<CreateBookData>) => {
+    updateBook: async (id: string | number, data: Partial<CreateBookData>) => {
         const formData = new FormData();
         if (data.title) formData.append('title', data.title);
         if (data.author) formData.append('author', data.author);
@@ -140,16 +141,18 @@ export const libraryService = {
         if (data.is_featured !== undefined) formData.append('is_featured', data.is_featured.toString());
         if (data.cover_image) formData.append('cover_image', data.cover_image);
         if (data.pdf_file) formData.append('pdf_file', data.pdf_file);
+        if (data.cover_url !== undefined) formData.append('cover_url', data.cover_url);
+        if (data.pdf_url !== undefined) formData.append('pdf_url', data.pdf_url);
 
         const response = await api.patch(`/api/library/books/${id}/`, formData);
         return response.data as LibraryBook;
     },
 
-    deleteBook: async (id: number) => {
+    deleteBook: async (id: string | number) => {
         await api.delete(`/api/library/books/${id}/`);
     },
 
-    toggleFeatured: async (id: number) => {
+    toggleFeatured: async (id: string | number) => {
         const response = await api.post(`/api/library/books/${id}/toggle_featured/`);
         return response.data as LibraryBook;
     },
@@ -170,7 +173,7 @@ export const libraryService = {
         return response.data as UserLibraryEntry[];
     },
 
-    addToLibrary: async (userId: string, bookId: number) => {
+    addToLibrary: async (userId: string, bookId: string | number) => {
         const response = await api.post('/api/library/user-library/', {
             user_id: userId,
             book_id: bookId,
@@ -178,36 +181,36 @@ export const libraryService = {
         return response.data as UserLibraryEntry;
     },
 
-    removeFromLibrary: async (entryId: number) => {
+    removeFromLibrary: async (entryId: string | number) => {
         await api.delete(`/api/library/user-library/${entryId}/`);
     },
 
-    toggleFavorite: async (entryId: number) => {
+    toggleFavorite: async (entryId: string | number) => {
         const response = await api.post(`/api/library/user-library/${entryId}/toggle_favorite/`);
         return response.data as UserLibraryEntry;
     },
 
-    updateProgress: async (entryId: number, currentPage: number) => {
+    updateProgress: async (entryId: string | number, currentPage: number) => {
         const response = await api.post(`/api/library/user-library/${entryId}/update_progress/`, {
             current_page: currentPage,
         });
         return response.data as UserLibraryEntry;
     },
 
-    rateBook: async (entryId: number, rating: number) => {
+    rateBook: async (entryId: string | number, rating: number) => {
         const response = await api.post(`/api/library/user-library/${entryId}/rate/`, {
             rating,
         });
         return response.data as UserLibraryEntry;
     },
 
-    updateLibraryEntry: async (entryId: number, data: Partial<UserLibraryEntry>) => {
+    updateLibraryEntry: async (entryId: string | number, data: Partial<UserLibraryEntry>) => {
         const response = await api.patch(`/api/library/user-library/${entryId}/`, data);
         return response.data as UserLibraryEntry;
     },
 
     // Bookmarks
-    getBookmarks: async (userId: string, bookId?: number) => {
+    getBookmarks: async (userId: string, bookId?: string | number) => {
         const queryParams = new URLSearchParams();
         queryParams.append('user_id', userId);
         if (bookId) queryParams.append('book_id', bookId.toString());
@@ -216,7 +219,7 @@ export const libraryService = {
         return response.data as Bookmark[];
     },
 
-    createBookmark: async (data: { user_id: string; book: number; page_number: number; paragraph_text?: string; note?: string; color?: string }) => {
+    createBookmark: async (data: { user_id: string; book: string | number; page_number: number; paragraph_text?: string; note?: string; color?: string }) => {
         const payload = {
             ...data,
             paragraph_text: sanitizeTextInput(data.paragraph_text),
@@ -227,12 +230,12 @@ export const libraryService = {
         return response.data as Bookmark;
     },
 
-    deleteBookmark: async (id: number) => {
+    deleteBookmark: async (id: string | number) => {
         await api.delete(`/api/library/bookmarks/${id}/`);
     },
 
     // Reading Sessions
-    startReadingSession: async (userId: string, bookId: number, startPage: number) => {
+    startReadingSession: async (userId: string, bookId: string | number, startPage: number) => {
         const response = await api.post('/api/library/reading-sessions/', {
             user_id: userId,
             book: bookId,
@@ -241,7 +244,7 @@ export const libraryService = {
         return response.data;
     },
 
-    endReadingSession: async (sessionId: number, endPage: number) => {
+    endReadingSession: async (sessionId: string | number, endPage: number) => {
         const response = await api.post(`/api/library/reading-sessions/${sessionId}/end_session/`, {
             end_page: endPage,
         });
