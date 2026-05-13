@@ -14,7 +14,8 @@ export function Topbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const username = session?.user?.username || "Guest";
+  const username =
+    session?.user?.username || session?.user?.email?.split("@")[0] || "BookConnect";
   const initials = username.substring(0, 2).toUpperCase();
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {

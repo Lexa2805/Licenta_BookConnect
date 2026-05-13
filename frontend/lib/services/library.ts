@@ -80,6 +80,19 @@ export interface Bookmark {
     paragraph_text: string;
     note: string;
     color: string;
+    vibe_card_image_url?: string;
+    vibe_card_prompt?: string;
+    vibe_card_caption?: string;
+    vibe_card_theme?: string;
+    vibe_card_mood?: string;
+    vibe_card_stickers?: Array<{
+        id: number;
+        emoji: string;
+        top: number;
+        left: number;
+        size: number;
+        rotate: number;
+    }>;
     created_at: string;
 }
 
@@ -219,11 +232,26 @@ export const libraryService = {
         return response.data as Bookmark[];
     },
 
-    createBookmark: async (data: { user_id: string; book: string | number; page_number: number; paragraph_text?: string; note?: string; color?: string }) => {
+    createBookmark: async (data: {
+        user_id: string;
+        book: string | number;
+        page_number: number;
+        paragraph_text?: string;
+        note?: string;
+        color?: string;
+        vibe_card_image_url?: string;
+        vibe_card_prompt?: string;
+        vibe_card_caption?: string;
+        vibe_card_theme?: string;
+        vibe_card_mood?: string;
+        vibe_card_stickers?: Bookmark["vibe_card_stickers"];
+    }) => {
         const payload = {
             ...data,
             paragraph_text: sanitizeTextInput(data.paragraph_text),
             note: sanitizeTextInput(data.note, { collapseWhitespace: false }),
+            vibe_card_caption: sanitizeTextInput(data.vibe_card_caption),
+            vibe_card_prompt: sanitizeTextInput(data.vibe_card_prompt, { collapseWhitespace: false }),
         };
 
         const response = await api.post('/api/library/bookmarks/', payload);

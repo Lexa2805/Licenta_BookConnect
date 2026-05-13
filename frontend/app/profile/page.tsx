@@ -14,7 +14,7 @@ export default function ProfilePage() {
   const { data: session } = useSession();
   const router = useRouter();
   
-  const username = session?.user?.username || "Guest";
+  const username = session?.user?.username || session?.user?.email?.split("@")[0] || "";
   const initials = username.substring(0, 2).toUpperCase();
 
   const { data: userLibrary = [], isLoading } = useQuery({
@@ -147,7 +147,7 @@ export default function ProfilePage() {
             wander a long time before finding your way out.&rdquo;
           </p>
           <div className="text-[12.5px] text-bc-subtext">
-            from <em>Norwegian Wood</em> · saved last week
+            from <em>Norwegian Wood</em>
           </div>
         </div>
       </section>

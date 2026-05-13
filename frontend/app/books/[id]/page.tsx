@@ -111,7 +111,7 @@ export default async function BookDetailsPage({
               </div>
             )}
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-bc-md border border-bc-border bg-bc-surface-muted p-4">
                 <div className="text-[11px] uppercase tracking-[0.08em] text-bc-subtext">
                   Author
@@ -132,14 +132,6 @@ export default async function BookDetailsPage({
                 </div>
                 <div className="mt-2 text-sm font-semibold text-bc-text">
                   {new Date(book.created_at).toLocaleDateString()}
-                </div>
-              </div>
-              <div className="rounded-bc-md border border-bc-border bg-bc-surface-muted p-4">
-                <div className="text-[11px] uppercase tracking-[0.08em] text-bc-subtext">
-                  Reading Route
-                </div>
-                <div className="mt-2 text-sm font-semibold text-bc-text">
-                  /library/read/{bookId}
                 </div>
               </div>
             </div>

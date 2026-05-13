@@ -275,6 +275,10 @@ def list_bookmarks(user_id=None, book_id=None):
 
 
 def create_bookmark(data):
+    vibe_card_stickers = data.get("vibe_card_stickers") or []
+    if not isinstance(vibe_card_stickers, list):
+        vibe_card_stickers = []
+
     document = {
         "user_id": data.get("user_id"),
         "book": str(data.get("book") or data.get("book_id") or ""),
@@ -282,6 +286,12 @@ def create_bookmark(data):
         "paragraph_text": data.get("paragraph_text") or "",
         "note": data.get("note") or "",
         "color": data.get("color") or "yellow",
+        "vibe_card_image_url": data.get("vibe_card_image_url") or "",
+        "vibe_card_prompt": data.get("vibe_card_prompt") or "",
+        "vibe_card_caption": data.get("vibe_card_caption") or "",
+        "vibe_card_theme": data.get("vibe_card_theme") or "",
+        "vibe_card_mood": data.get("vibe_card_mood") or "",
+        "vibe_card_stickers": vibe_card_stickers,
         "created_at": _now(),
     }
     result = get_collection(BOOKMARKS).insert_one(document)

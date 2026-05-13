@@ -266,6 +266,25 @@ function reseedVibeCardStickers(stickers: VibeCardSticker[]) {
   );
 }
 
+function getVibeQuoteStyle(text: string) {
+  const length = sanitizeBookmarkText(text).length;
+
+  if (length > 520) {
+    return { fontSize: "0.66rem", lineHeight: 1.2, maxLines: 13 };
+  }
+  if (length > 380) {
+    return { fontSize: "0.74rem", lineHeight: 1.24, maxLines: 12 };
+  }
+  if (length > 260) {
+    return { fontSize: "0.84rem", lineHeight: 1.3, maxLines: 11 };
+  }
+  if (length > 160) {
+    return { fontSize: "0.96rem", lineHeight: 1.36, maxLines: 10 };
+  }
+
+  return { fontSize: "1.05rem", lineHeight: 1.45, maxLines: 8 };
+}
+
 export function BookReaderClient({
   bookId,
   initialBook,
@@ -273,11 +292,12 @@ export function BookReaderClient({
   bookId: string | number;
   initialBook: LibraryBook;
 }) {
-  const { data: session } = useSession();
-  const userId = session?.user?.id || "user_123";
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id || "";
   const [book] = useState(initialBook);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [currentPageText, setCurrentPageText] = useState("");
   const [totalPages, setTotalPages] = useState(0);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [bookmarkDraft, setBookmarkDraft] = useState<BookmarkDraft>(createEmptyBookmarkDraft);
@@ -293,6 +313,7 @@ export function BookReaderClient({
   const [vibeCardStickers, setVibeCardStickers] = useState<VibeCardSticker[]>([]);
   const [sidebarVibeLoading, setSidebarVibeLoading] = useState<string | number | null>(null);
   const [sidebarVibeResult, setSidebarVibeResult] = useState<SidebarVibeCard | null>(null);
+  const [savedCardPreview, setSavedCardPreview] = useState<Bookmark | null>(null);
   const [fontSize, setFontSize] = useState(16);
   const [isDarkReader, setIsDarkReader] = useState(false);
   const [pdfScale, setPdfScale] = useState(1);
@@ -307,6 +328,7 @@ export function BookReaderClient({
   const maxPages = totalPages || book.pages || 1;
   const pdfUrl = book.pdf || book.pdf_url;
   const activeVibeCardTheme = getVibeCardTheme(vibeCardThemeId);
+  const vibeQuoteStyle = getVibeQuoteStyle(bookmarkDraft.text);
 
   const resetVibeCardDecor = useCallback(() => {
     setSelectedMoodEmoji("");
@@ -334,9 +356,14 @@ export function BookReaderClient({
 
   useEffect(() => {
     currentPageRef.current = currentPage;
+    setCurrentPageText("");
   }, [currentPage]);
 
   const loadBookmarks = useCallback(async () => {
+    if (!userId) {
+      return;
+    }
+
     try {
       const data = await libraryService.getBookmarks(userId, bookId);
       setBookmarks(data);
@@ -346,13 +373,22 @@ export function BookReaderClient({
   }, [bookId, userId]);
 
   useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
     loadBookmarks();
-  }, [loadBookmarks]);
+  }, [loadBookmarks, userId]);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadProgress = async () => {
+      if (!userId) {
+        setLoadingLibraryState(false);
+        return;
+      }
+
       setLoadingLibraryState(true);
       try {
         const library = await libraryService.getUserLibrary(userId);
@@ -379,7 +415,7 @@ export function BookReaderClient({
   }, [bookId, maxPages, userId]);
 
   useEffect(() => {
-    if (loadingLibraryState || sessionStartedRef.current) {
+    if (!userId || loadingLibraryState || sessionStartedRef.current) {
       return;
     }
 
@@ -409,6 +445,10 @@ export function BookReaderClient({
   }, [readingSessionId]);
 
   const handleSaveProgress = useCallback(async () => {
+    if (!userId) {
+      return;
+    }
+
     try {
       setSaveStatus("saving");
       const library = await libraryService.getUserLibrary(userId);
@@ -446,6 +486,10 @@ export function BookReaderClient({
   }, [resetBookmarkAiState, resetVibeCardDecor]);
 
   const handleAddBookmark = useCallback(async () => {
+    if (!userId) {
+      return;
+    }
+
     const cleanedText = sanitizeBookmarkText(bookmarkDraft.text);
     const cleanedNote = sanitizeBookmarkText(bookmarkDraft.note, {
       collapseWhitespace: false,
@@ -463,6 +507,12 @@ export function BookReaderClient({
         paragraph_text: cleanedText,
         note: cleanedNote,
         color: bookmarkDraft.color,
+        vibe_card_image_url: vibeCardResult?.imageUrl,
+        vibe_card_prompt: vibeCardResult?.prompt,
+        vibe_card_caption: vibeCardResult?.caption,
+        vibe_card_theme: vibeCardResult ? vibeCardThemeId : undefined,
+        vibe_card_mood: vibeCardResult ? selectedMoodEmoji : undefined,
+        vibe_card_stickers: vibeCardResult ? vibeCardStickers : undefined,
       });
 
       closeBookmarkModal();
@@ -470,7 +520,18 @@ export function BookReaderClient({
     } catch (error) {
       console.error("Error adding bookmark:", error);
     }
-  }, [bookmarkDraft, bookId, closeBookmarkModal, currentPage, loadBookmarks, userId]);
+  }, [
+    bookmarkDraft,
+    bookId,
+    closeBookmarkModal,
+    currentPage,
+    loadBookmarks,
+    selectedMoodEmoji,
+    userId,
+    vibeCardResult,
+    vibeCardStickers,
+    vibeCardThemeId,
+  ]);
 
   const handleMagicSuggest = useCallback(async () => {
     const cleanedText = sanitizeBookmarkText(bookmarkDraft.text);
@@ -485,7 +546,13 @@ export function BookReaderClient({
     setMagicSuggestion(null);
 
     try {
-      const suggestion = await generateBookmarkSuggestion(cleanedText, book.title, book.author);
+      const suggestion = await generateBookmarkSuggestion(
+        cleanedText,
+        book.title,
+        book.author,
+        currentPageText,
+        currentPage,
+      );
 
       if (magicSuggestRequestRef.current !== requestId) {
         return;
@@ -510,7 +577,7 @@ export function BookReaderClient({
         setMagicSuggestLoading(false);
       }
     }
-  }, [book.author, book.title, bookmarkDraft.text]);
+  }, [book.author, book.title, bookmarkDraft.text, currentPage, currentPageText]);
 
   const handleAddSticker = useCallback((emoji: string) => {
     setVibeCardStickers((current) => {
@@ -668,6 +735,29 @@ export function BookReaderClient({
     [loadBookmarks],
   );
 
+  const savedCardTheme = savedCardPreview
+    ? getVibeCardTheme((savedCardPreview.vibe_card_theme as VibeCardThemeId) || "editorial")
+    : null;
+  const savedCardQuoteStyle = savedCardPreview
+    ? getVibeQuoteStyle(savedCardPreview.paragraph_text || savedCardPreview.note)
+    : null;
+  const savedCardStickers = Array.isArray(savedCardPreview?.vibe_card_stickers)
+    ? savedCardPreview.vibe_card_stickers
+    : [];
+
+  if (status === "loading" || !userId) {
+    return (
+      <main className="min-h-screen bg-bc-bg text-bc-text grid place-items-center px-6">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-bc-primary border-t-transparent" />
+          <p className="mt-4 text-sm font-medium text-bc-subtext">
+            Checking your session...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   if (loadingLibraryState) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bc-bg">
@@ -815,6 +905,11 @@ export function BookReaderClient({
               currentPage={currentPage}
               onPageChange={setCurrentPage}
               onLoadSuccess={setTotalPages}
+              onPageTextLoad={(page, text) => {
+                if (page === currentPageRef.current) {
+                  setCurrentPageText(text);
+                }
+              }}
               isDarkMode={isDarkReader}
               scale={pdfScale}
             />
@@ -869,6 +964,36 @@ export function BookReaderClient({
                         <p className="text-sm text-bc-text-soft">{bookmark.note}</p>
                       )}
 
+                      {bookmark.vibe_card_image_url && (
+                        <div className="mt-3 overflow-hidden rounded-2xl border border-bc-border bg-bc-bg-elev shadow-bc-sm">
+                          <div className="relative aspect-square bg-bc-surface-muted">
+                            <img
+                              src={bookmark.vibe_card_image_url}
+                              alt="Saved bookmark social card"
+                              className="h-full w-full object-cover"
+                              onError={(event) => {
+                                event.currentTarget.src =
+                                  getPollinationsImageUrl(FALLBACK_VIBE_PROMPT);
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent p-4">
+                              <div className="flex h-full flex-col justify-end">
+                                {bookmark.paragraph_text && (
+                                  <p className="line-clamp-4 text-sm italic leading-relaxed text-white">
+                                    "{bookmark.paragraph_text}"
+                                  </p>
+                                )}
+                                {bookmark.vibe_card_caption && (
+                                  <p className="mt-3 text-sm font-semibold text-white">
+                                    {bookmark.vibe_card_caption}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
@@ -882,13 +1007,23 @@ export function BookReaderClient({
                         {(bookmark.paragraph_text || bookmark.note) && (
                           <button
                             type="button"
-                            onClick={() => handleSidebarVibeCard(bookmark)}
+                            onClick={() => {
+                              if (bookmark.vibe_card_image_url) {
+                                setSavedCardPreview(bookmark);
+                                setSidebarVibeResult(null);
+                                return;
+                              }
+
+                              handleSidebarVibeCard(bookmark);
+                            }}
                             disabled={sidebarVibeLoading === bookmark.id}
                             className="rounded-full border border-bc-border px-3 py-1 text-xs font-medium text-bc-text transition hover:bg-bc-surface-muted disabled:cursor-wait disabled:opacity-70"
                           >
                             {sidebarVibeLoading === bookmark.id
                               ? "Creating card..."
-                              : "Create social card"}
+                              : bookmark.vibe_card_image_url
+                                ? "View saved card"
+                                : "Create social card"}
                           </button>
                         )}
                       </div>
@@ -950,6 +1085,124 @@ export function BookReaderClient({
           </aside>
         )}
       </div>
+
+      {savedCardPreview && savedCardTheme && savedCardQuoteStyle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-bc-border bg-bc-surface shadow-bc-xl">
+            <div className="flex items-center justify-between gap-3 border-b border-bc-border px-4 py-3">
+              <div>
+                <h3 className="text-base font-semibold text-bc-text">Saved social card</h3>
+                <p className="text-xs text-bc-subtext">Page {savedCardPreview.page_number}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSavedCardPreview(null)}
+                className="rounded-full border border-bc-border px-3 py-1.5 text-xs font-medium text-bc-text transition hover:bg-bc-surface-muted"
+              >
+                Close
+              </button>
+            </div>
+
+            <div
+              className={[
+                "relative aspect-square overflow-hidden bg-[radial-gradient(circle_at_20%_20%,rgba(232,169,169,0.55),transparent_34%),radial-gradient(circle_at_84%_12%,rgba(138,169,143,0.5),transparent_30%),radial-gradient(circle_at_58%_86%,rgba(168,184,200,0.55),transparent_36%),linear-gradient(135deg,#7c3f22,#264f68_42%,#74435b_72%,#c46a2b)]",
+                savedCardTheme.frameClass,
+              ].join(" ")}
+            >
+              <img
+                src={savedCardPreview.vibe_card_image_url}
+                alt="Saved bookmark social card"
+                className="absolute inset-0 h-full w-full object-cover"
+                onError={(event) => {
+                  event.currentTarget.src = getPollinationsImageUrl(FALLBACK_VIBE_PROMPT);
+                }}
+              />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,214,102,0.22),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(159,123,140,0.28),transparent_38%)] mix-blend-screen" />
+              <div className={savedCardTheme.overlayClass}>
+                <div className={savedCardTheme.chipClass}>
+                  {savedCardPreview.vibe_card_mood ? `${savedCardPreview.vibe_card_mood} ` : ""}
+                  {savedCardTheme.name}
+                </div>
+
+                {savedCardStickers.map((sticker) => (
+                  <div
+                    key={sticker.id}
+                    className="absolute flex items-center justify-center rounded-[18px] border border-white/25 bg-black/20 shadow-[0_10px_24px_rgba(0,0,0,0.25)] backdrop-blur-md"
+                    style={{
+                      top: `${sticker.top}%`,
+                      left: `${sticker.left}%`,
+                      width: `${sticker.size + 18}px`,
+                      height: `${sticker.size + 18}px`,
+                      transform: `translate(-50%, -50%) rotate(${sticker.rotate}deg)`,
+                      fontSize: `${sticker.size}px`,
+                    }}
+                  >
+                    {sticker.emoji}
+                  </div>
+                ))}
+
+                <div className={savedCardTheme.contentClass}>
+                  <div className={savedCardTheme.bodyClass}>
+                    <p
+                      className={savedCardTheme.quoteClass}
+                      style={{
+                        fontFamily: savedCardTheme.quoteFont,
+                        fontSize: savedCardQuoteStyle.fontSize,
+                        fontStyle: "italic",
+                        lineHeight: savedCardQuoteStyle.lineHeight,
+                        display: "-webkit-box",
+                        WebkitBoxOrient: "vertical",
+                        WebkitLineClamp: savedCardQuoteStyle.maxLines,
+                        overflow: "hidden",
+                      }}
+                      title={savedCardPreview.paragraph_text}
+                    >
+                      "{savedCardPreview.paragraph_text || savedCardPreview.note}"
+                    </p>
+                    {savedCardPreview.vibe_card_caption && (
+                      <p
+                        className={savedCardTheme.captionClass}
+                        style={{ fontFamily: savedCardTheme.captionFont }}
+                      >
+                        {savedCardPreview.vibe_card_caption}
+                      </p>
+                    )}
+                    <p
+                      className={savedCardTheme.metaClass}
+                      style={{ fontFamily: savedCardTheme.metaFont }}
+                    >
+                      {book.title} â€¢ {book.author} â€¢ BookConnect
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 border-t border-bc-border bg-bc-surface p-3">
+              <button
+                type="button"
+                onClick={() => handleDownloadVibeCard(savedCardPreview.vibe_card_image_url || "")}
+                className="flex-1 rounded-full bg-bc-primary-soft px-3 py-2 text-xs font-medium text-bc-primary transition hover:bg-bc-primary-soft-strong"
+              >
+                Download
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleShareVibeCard(savedCardPreview.paragraph_text || savedCardPreview.note, {
+                    imageUrl: savedCardPreview.vibe_card_image_url || "",
+                    prompt: savedCardPreview.vibe_card_prompt || "",
+                    caption: savedCardPreview.vibe_card_caption || "Saved social card",
+                  })
+                }
+                className="flex-1 rounded-full border border-bc-border px-3 py-2 text-xs font-medium text-bc-text transition hover:bg-bc-surface-muted"
+              >
+                Share or Copy Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {bookmarkDraft.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -1223,7 +1476,7 @@ export function BookReaderClient({
                 <div className="mt-4 overflow-hidden rounded-2xl border border-bc-border bg-bc-bg-elev shadow-bc-sm">
                   <div
                     className={[
-                      "relative aspect-square overflow-hidden",
+                      "relative aspect-square overflow-hidden bg-[radial-gradient(circle_at_20%_20%,rgba(232,169,169,0.55),transparent_34%),radial-gradient(circle_at_84%_12%,rgba(138,169,143,0.5),transparent_30%),radial-gradient(circle_at_58%_86%,rgba(168,184,200,0.55),transparent_36%),linear-gradient(135deg,#7c3f22,#264f68_42%,#74435b_72%,#c46a2b)]",
                       activeVibeCardTheme.frameClass,
                     ].join(" ")}
                   >
@@ -1242,12 +1495,13 @@ export function BookReaderClient({
                           key={vibeCardResult.imageUrl}
                           src={vibeCardResult.imageUrl}
                           alt="Generated social card"
-                          className="absolute inset-0 h-full w-full object-cover"
+                          className="absolute inset-0 h-full w-full object-cover mix-blend-normal"
                           onError={(event) => {
                             event.currentTarget.src =
                               getPollinationsImageUrl(FALLBACK_VIBE_PROMPT);
                           }}
                         />
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,214,102,0.22),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(159,123,140,0.28),transparent_38%)] mix-blend-screen" />
                         <div className={activeVibeCardTheme.overlayClass}>
                           <div className={activeVibeCardTheme.chipClass}>
                             {selectedMoodEmoji ? `${selectedMoodEmoji} ` : ""}
@@ -1277,10 +1531,15 @@ export function BookReaderClient({
                               className={activeVibeCardTheme.quoteClass}
                               style={{
                                 fontFamily: activeVibeCardTheme.quoteFont,
-                                fontSize: "1.05rem",
+                                fontSize: vibeQuoteStyle.fontSize,
                                 fontStyle: "italic",
-                                lineHeight: 1.45,
+                                lineHeight: vibeQuoteStyle.lineHeight,
+                                display: "-webkit-box",
+                                WebkitBoxOrient: "vertical",
+                                WebkitLineClamp: vibeQuoteStyle.maxLines,
+                                overflow: "hidden",
                               }}
+                              title={bookmarkDraft.text}
                             >
                               "{bookmarkDraft.text}"
                             </p>
@@ -1359,13 +1618,14 @@ export function BookReaderClient({
               <button
                 type="button"
                 onClick={handleAddBookmark}
+                disabled={vibeCardLoading}
                 className={[
                   "flex-1 rounded-xl px-4 py-3 text-white shadow-bc-sm",
                   MODAL_BUTTON_BASE,
                   "bg-bc-text hover:bg-bc-text-soft hover:-translate-y-0.5 hover:shadow-bc-md",
                 ].join(" ")}
               >
-                Save Bookmark
+                {vibeCardLoading ? "Waiting for card..." : "Save Bookmark"}
               </button>
             </div>
           </div>

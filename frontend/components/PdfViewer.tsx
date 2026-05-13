@@ -12,6 +12,7 @@ interface PdfViewerProps {
   currentPage: number;
   onPageChange?: (page: number) => void;
   onLoadSuccess?: (numPages: number) => void;
+  onPageTextLoad?: (page: number, text: string) => void;
   isDarkMode?: boolean;
   scale?: number;
 }
@@ -21,6 +22,7 @@ export default function PdfViewer({
   currentPage,
   onPageChange,
   onLoadSuccess,
+  onPageTextLoad,
   isDarkMode = false,
   scale = 1,
 }: PdfViewerProps) {
@@ -29,11 +31,13 @@ export default function PdfViewer({
   const [error, setError] = useState<string | null>(null);
   const [proxyUrl, setProxyUrl] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [pdfDocument, setPdfDocument] = useState<any>(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
     setNumPages(0);
+    setPdfDocument(null);
 
     if (!pdfUrl?.trim()) {
       setProxyUrl("");
@@ -68,7 +72,44 @@ export default function PdfViewer({
     onPageChange?.(numPages);
   }, [currentPage, numPages, onPageChange]);
 
-  const handleLoadSuccess = ({ numPages: loadedPages }: { numPages: number }) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPageText() {
+      if (!pdfDocument || !currentPage || !onPageTextLoad) {
+        return;
+      }
+
+      try {
+        const page = await pdfDocument.getPage(currentPage);
+        const textContent = await page.getTextContent();
+        const text = textContent.items
+          .map((item: { str?: string }) => item.str || "")
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+
+        if (!cancelled) {
+          onPageTextLoad(currentPage, text);
+        }
+      } catch (nextError) {
+        console.error("Error extracting PDF page text:", nextError);
+        if (!cancelled) {
+          onPageTextLoad(currentPage, "");
+        }
+      }
+    }
+
+    loadPageText();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPage, onPageTextLoad, pdfDocument]);
+
+  const handleLoadSuccess = (pdf: { numPages: number }) => {
+    setPdfDocument(pdf);
+    const loadedPages = pdf.numPages;
     setNumPages(loadedPages);
     setLoading(false);
     onLoadSuccess?.(loadedPages);

@@ -1,4 +1,8 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import type { NavKey } from "@/lib/nav";
@@ -18,6 +22,30 @@ export function PageLayout({
   headerActions,
   children,
 }: PageLayoutProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { status } = useSession();
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      const callbackUrl = pathname && pathname !== "/" ? `?callbackUrl=${encodeURIComponent(pathname)}` : "";
+      router.replace(`/login${callbackUrl}`);
+    }
+  }, [pathname, router, status]);
+
+  if (status === "loading" || status === "unauthenticated") {
+    return (
+      <main className="min-h-screen bg-bc-bg text-bc-text grid place-items-center px-6">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-bc-primary border-t-transparent" />
+          <p className="mt-4 text-sm font-medium text-bc-subtext">
+            Checking your session...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-bc-bg text-bc-text">
       <Sidebar active={active} />

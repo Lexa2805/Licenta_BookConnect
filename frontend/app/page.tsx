@@ -10,12 +10,12 @@ import { CommunityPulse } from "@/components/home/CommunityPulse";
 
 export default function HomePage() {
   const { data: session } = useSession();
-  const username = session?.user?.username || "Guest";
+  const username = session?.user?.username || session?.user?.email?.split("@")[0] || "";
 
   return (
     <PageLayout
       active="home"
-      pageTitle={`Welcome back, ${username}`}
+      pageTitle={username ? `Welcome back, ${username}` : "Welcome back"}
       pageSubtitle="A few stories chose you this week. Take a moment."
     >
       <Hero />

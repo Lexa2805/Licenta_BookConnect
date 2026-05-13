@@ -116,9 +116,11 @@ export async function generateBookmarkSuggestion(
   selectedText: string,
   bookTitle: string,
   bookAuthor: string,
+  pageContext: string = "",
+  pageNumber?: number,
 ): Promise<BookmarkSuggestion> {
   const systemPrompt = `You are a literary analysis assistant for a book-reading app called BookConnect.
-When given a passage from a book, you produce:
+When given a selected passage and optional surrounding page text from the real book page, you produce:
 1. A concise, insightful note (2-3 sentences) about the passage, highlighting theme, symbolism, character insight, or emotional resonance.
 2. A highlight color choice based on the passage type:
    - "yellow" -> Key quote, important fact, or memorable line
@@ -127,6 +129,10 @@ When given a passage from a book, you produce:
    - "pink"   -> Emotional, romantic, or heartfelt passage
    - "purple" -> Philosophical, thematic, or thought-provoking idea
 
+Be honest and grounded. Use only the selected passage and page context provided.
+Do not invent plot, character relationships, or themes that are not supported by the text.
+If the selected passage is short or ambiguous, say that the suggestion is based on limited context and choose the safest color.
+
 Respond only with a JSON object in this exact format:
 {
   "note": "Your insightful note here...",
@@ -134,12 +140,20 @@ Respond only with a JSON object in this exact format:
   "reasoning": "Brief explanation of why you chose this color"
 }`;
 
+  const pageContextBlock = pageContext
+    ? `Page ${pageNumber ?? "current"} context:
+"${pageContext.slice(0, 5000)}"`
+    : "Page context was not available from the PDF text layer.";
+
   const userPrompt = `Book: "${bookTitle}" by ${bookAuthor}
+${pageNumber ? `Page: ${pageNumber}` : ""}
 
 Selected passage:
 "${selectedText}"
 
-Analyze this passage and suggest a bookmark note and highlight color.`;
+${pageContextBlock}
+
+Analyze the selected passage using the page context. Return an honest bookmark note, color, and reasoning.`;
 
   const raw = await callOpenRouter([
     { role: "system", content: systemPrompt },
@@ -166,11 +180,11 @@ export async function generateVibeCardPrompt(
   const uniqueSeed = generateUniqueSeed();
 
   const colorMoods: Record<string, string> = {
-    yellow: "warm golden tones, sunlit amber, honey hues, radiant warmth",
-    green: "lush emerald greens, forest tones, natural earth palette, verdant life",
-    blue: "deep ocean blues, twilight sky, cerulean and navy, cool serenity",
-    pink: "soft rose pinks, blush tones, warm coral, romantic pastels",
-    purple: "rich violet and amethyst, deep plum, mystical indigo, regal tones",
+    yellow: "warm golden tones, sunlit amber, honey hues, radiant warmth, with teal and rose accents",
+    green: "lush emerald greens, forest tones, natural earth palette, verdant life, with coral and gold accents",
+    blue: "deep ocean blues, twilight sky, cerulean and navy, cool serenity, with saffron and magenta accents",
+    pink: "soft rose pinks, blush tones, warm coral, romantic pastels, with sage and sky blue accents",
+    purple: "rich violet and amethyst, deep plum, mystical indigo, regal tones, with gold and turquoise accents",
   };
   const colorMood = colorMoods[highlightColor] || colorMoods.yellow;
 
@@ -248,10 +262,11 @@ export async function generateVibeCardPrompt(
 
   const systemPrompt = `You are a visual art director for a book-reading social media app.
 Given a book passage, you create:
-1. An artistic image prompt for an AI image generator that captures the mood, atmosphere, and emotion of the passage. The prompt should describe a scene, color palette, and artistic style, not literal text or typography. Keep it under 120 words.
+1. An artistic image prompt for an AI image generator that captures the mood, atmosphere, and emotion of the passage. The prompt should describe a vivid, colorful scene, rich color palette, and artistic style, not literal text or typography. Keep it under 120 words.
 2. A short social-media caption, 1 line, under 15 words.
 
 COLOR DIRECTION: The dominant palette must favor ${colorMood}.
+BACKGROUND DIRECTION: Avoid plain black, gray, or empty backgrounds. Use layered color, visible scenery, luminous atmosphere, and at least three distinct accent colors.
 ART STYLE: You must use this art style: "${randomStyle}".
 COMPOSITION: You must use this composition direction: "${compositionDirection}".${emojiDirection}${variationDirection}
 Each generation must feel like a completely different artwork.
@@ -285,7 +300,7 @@ Create a unique, ${randomStyle}-inspired artwork in ${colorMood} palette for thi
   const safePrompt = cleanPrompt.slice(0, 350);
   const emojiImageHint = emojiHint ? `, ${emojiHint}` : "";
   const variationImageHint = variationHint ? `, ${variationHint}` : "";
-  const uniquePrompt = `${safePrompt}, ${randomStyle}, ${compositionDirection}${emojiImageHint}${variationImageHint}, hyper-detailed, high quality`;
+  const uniquePrompt = `${safePrompt}, ${randomStyle}, ${compositionDirection}${emojiImageHint}${variationImageHint}, vibrant colorful background, layered luminous atmosphere, rich saturated color palette, visible scenery, cinematic color contrast, hyper-detailed, high quality`;
   const imageUrl = getPollinationsImageUrl(uniquePrompt, 1080, 1080, uniqueSeed);
 
   return {
