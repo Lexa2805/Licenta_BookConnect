@@ -5,10 +5,8 @@ import { BookOpen, LayoutGrid, Store } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Hero } from "@/components/home/Hero";
-import { StatsStrip } from "@/components/home/StatsStrip";
-import { ContinueReading } from "@/components/home/ContinueReading";
+import { ReadingCalendarMini } from "@/components/home/ReadingCalendarMini";
 import { Recommended } from "@/components/home/Recommended";
-import { CommunityPulse } from "@/components/home/CommunityPulse";
 import { canReadLibrary, canUseStudio } from "@/lib/roles";
 
 export default function HomePage() {
@@ -30,14 +28,12 @@ export default function HomePage() {
       {showReaderHome ? (
         <>
           <Hero />
-          <StatsStrip />
-          <ContinueReading />
+          <ReadingCalendarMini />
           <Recommended />
         </>
       ) : (
         <WriterHome />
       )}
-      <CommunityPulse />
     </PageLayout>
   );
 }

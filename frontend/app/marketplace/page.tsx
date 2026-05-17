@@ -11,16 +11,24 @@ import { BookCover } from "@/components/books/BookCover";
 import { useQuery } from "@tanstack/react-query";
 import { marketplaceService } from "@/lib/services/marketplace";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
-const FILTERS = ["All", "Swap-friendly", "Under 10 Lei", "Like new", "Near me"];
+const FILTERS = ["All", "Wishlist", "Swap-friendly", "Under 10 Lei", "Like new", "Near me"];
 
 export default function MarketplacePage() {
   const [filter, setFilter] = useState("All");
   const router = useRouter();
+  const { data: session } = useSession();
 
   const { data: listings = [], isLoading } = useQuery({
     queryKey: ["marketplace-listings"],
     queryFn: () => marketplaceService.getListings(),
+  });
+
+  const { data: wishlist = [], isLoading: loadingWishlist } = useQuery({
+    queryKey: ["marketplace-wishlist", session?.user?.id],
+    queryFn: () => marketplaceService.getWishlist(session!.user.id as string),
+    enabled: !!session?.user?.id && filter === "Wishlist",
   });
 
   const getGradientSeed = (id: string | number) => {
@@ -40,8 +48,10 @@ export default function MarketplacePage() {
     return gradients[getGradientSeed(id) % gradients.length];
   };
 
-  const filteredListings = listings.filter((book) => {
+  const sourceListings = filter === "Wishlist" ? wishlist : listings;
+  const filteredListings = sourceListings.filter((book) => {
     if (filter === "All") return true;
+    if (filter === "Wishlist") return true;
     if (filter === "Under 10 Lei") return parseFloat(book.price) < 10;
     if (filter === "Like new") return book.condition.toLowerCase().includes("like new");
     if (filter === "Swap-friendly") return parseFloat(book.price) === 0; // Assuming 0 price means swap
@@ -69,13 +79,13 @@ export default function MarketplacePage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isLoading || loadingWishlist ? (
         <div className="grid place-items-center py-20 text-bc-primary">
           <Loader2 className="animate-spin w-8 h-8" />
         </div>
       ) : filteredListings.length === 0 ? (
         <div className="grid place-items-center py-20 text-bc-subtext">
-          <p>No listings found matching your criteria.</p>
+          <p>{filter === "Wishlist" ? "No marketplace books in your wishlist yet." : "No listings found matching your criteria."}</p>
         </div>
       ) : (
         <div className="bc-stagger grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">

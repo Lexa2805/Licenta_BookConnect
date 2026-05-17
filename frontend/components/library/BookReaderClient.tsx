@@ -205,6 +205,24 @@ function getBookmarkBgClass(color: string) {
   return map[color] ?? map.yellow;
 }
 
+function getBookmarkMarkerStyle(color: string) {
+  const map: Record<string, string> = {
+    yellow: "rgba(253,224,71,0.72)",
+    green: "rgba(134,239,172,0.68)",
+    blue: "rgba(147,197,253,0.68)",
+    pink: "rgba(249,168,212,0.68)",
+    purple: "rgba(196,181,253,0.68)",
+  };
+
+  return {
+    background: map[color] ?? map.yellow,
+    borderRadius: "4px",
+    boxDecorationBreak: "clone" as const,
+    WebkitBoxDecorationBreak: "clone" as const,
+    padding: "0 2px",
+  };
+}
+
 function clampPage(page: number, maxPages: number) {
   return Math.min(maxPages, Math.max(1, page));
 }
@@ -903,6 +921,11 @@ export function BookReaderClient({
             <PdfViewer
               pdfUrl={pdfUrl}
               currentPage={currentPage}
+              highlights={bookmarks.map((bookmark) => ({
+                page: bookmark.page_number,
+                text: bookmark.paragraph_text,
+                color: bookmark.color,
+              }))}
               onPageChange={setCurrentPage}
               onLoadSuccess={setTotalPages}
               onPageTextLoad={(page, text) => {
@@ -956,7 +979,11 @@ export function BookReaderClient({
 
                       {bookmark.paragraph_text && (
                         <p className="mb-2 line-clamp-3 text-sm italic text-bc-text-soft">
-                          "{bookmark.paragraph_text}"
+                          &ldquo;
+                          <span style={getBookmarkMarkerStyle(bookmark.color)}>
+                            {bookmark.paragraph_text}
+                          </span>
+                          &rdquo;
                         </p>
                       )}
 
@@ -1235,7 +1262,11 @@ export function BookReaderClient({
                     </span>
                   </div>
                   <p className="mt-3 text-sm italic leading-7 text-bc-text-soft">
-                    "{bookmarkDraft.text}"
+                    &ldquo;
+                    <span style={getBookmarkMarkerStyle(bookmarkDraft.color)}>
+                      {bookmarkDraft.text}
+                    </span>
+                    &rdquo;
                   </p>
                 </div>
 

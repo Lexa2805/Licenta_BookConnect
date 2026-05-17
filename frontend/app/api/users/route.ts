@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { normalizeRole } from "@/lib/roles";
+import { cloudinaryImageUrl } from "@/lib/server/cloudinary";
 
 export async function GET(request: NextRequest) {
     try {
@@ -61,20 +62,33 @@ export async function GET(request: NextRequest) {
                     username: 1,
                     email: 1,
                     role: 1,
+                    profile: 1,
+                    image: 1,
+                    image_public_id: 1,
                     created_at: 1,
+                    createdAt: 1,
                 },
             })
             .sort({ username: 1 })
             .limit(ids.length > 0 ? ids.length : 50)
             .toArray();
 
-        const result = users.map((u) => ({
-            id: u._id.toString(),
-            username: u.username,
-            email: u.email,
-            role: normalizeRole(u.role),
-            created_at: u.created_at || null,
-        }));
+        const result = users.map((u) => {
+            const avatarPublicId = u.profile?.avatar_public_id || u.image_public_id || "";
+
+            return {
+                id: u._id.toString(),
+                username: u.username,
+                email: u.email,
+                role: normalizeRole(u.role),
+                profile: {
+                    avatar_url: cloudinaryImageUrl(avatarPublicId) || u.profile?.avatar_url || u.image || "",
+                    avatar_public_id: avatarPublicId,
+                    about: u.profile?.about || "",
+                },
+                created_at: u.created_at || u.createdAt || null,
+            };
+        });
 
         if (ids.length > 0) {
             const resultById = new Map(result.map((user) => [user.id, user]));

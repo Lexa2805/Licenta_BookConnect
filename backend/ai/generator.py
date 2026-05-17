@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent
 MODEL_CORRECT_PATH = BASE_DIR / "model_correct.pth"
 MODEL_CONTINUE_PATH = BASE_DIR / "model_continue.pth"
 
-# dacă ai doar config-ul ăsta, îl folosim pentru ambele
+
 CONFIG_CORRECT_PATH = BASE_DIR / "model_config_v3.json"
 CONFIG_CONTINUE_PATH = BASE_DIR / "model_config_v3.json"
 

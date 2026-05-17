@@ -46,6 +46,8 @@ export default function BookDetailPage() {
     const [reviewComment, setReviewComment] = useState("");
     const [submittingReview, setSubmittingReview] = useState(false);
     const [isWishlisted, setIsWishlisted] = useState(false);
+    const [wishlistLoading, setWishlistLoading] = useState(false);
+    const [buying, setBuying] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -54,15 +56,16 @@ export default function BookDetailPage() {
     }, [id]);
 
     useEffect(() => {
-        if (!id) return;
-
-        try {
-            const saved = JSON.parse(localStorage.getItem("bookconnect-marketplace-wishlist") || "[]") as string[];
-            setIsWishlisted(saved.includes(id));
-        } catch {
+        if (!id || !session?.user?.id) {
             setIsWishlisted(false);
+            return;
         }
-    }, [id]);
+
+        marketplaceService
+            .getWishlistStatus(id, session.user.id)
+            .then((result) => setIsWishlisted(result.is_wishlisted))
+            .catch(() => setIsWishlisted(false));
+    }, [id, session?.user?.id]);
 
     const loadListing = async () => {
         try {
@@ -138,7 +141,7 @@ export default function BookDetailPage() {
         }
     };
 
-    const handleBuyNow = () => {
+    const handleBuyNow = async () => {
         if (!listing) return;
 
         if (!session?.user) {
@@ -151,26 +154,48 @@ export default function BookDetailPage() {
             return;
         }
 
-        router.push(
-            `/community/dm/${listing.seller_id}?name=${encodeURIComponent(
-                listing.seller_name,
-            )}&book=${encodeURIComponent(listing.title)}`,
-        );
+        if (listing.status !== "LISTED") {
+            alert("This listing is no longer available.");
+            return;
+        }
+
+        setBuying(true);
+        try {
+            const updated = await marketplaceService.buyNow(listing.id, {
+                user_id: session.user.id,
+                buyer_name: session.user.username || session.user.email || "Anonymous Buyer",
+            });
+            setListing(updated);
+            setIsWishlisted(false);
+            alert("Purchase saved. You can now contact the seller to arrange delivery.");
+            router.push(
+                `/community/dm/${listing.seller_id}?name=${encodeURIComponent(
+                    listing.seller_name,
+                )}&book=${encodeURIComponent(listing.title)}`,
+            );
+        } catch (error) {
+            alert(error instanceof Error ? error.message : "Could not complete purchase.");
+        } finally {
+            setBuying(false);
+        }
     };
 
-    const handleToggleWishlist = () => {
+    const handleToggleWishlist = async () => {
         if (!listing) return;
 
+        if (!session?.user?.id) {
+            router.push("/login");
+            return;
+        }
+
+        setWishlistLoading(true);
         try {
-            const saved = JSON.parse(localStorage.getItem("bookconnect-marketplace-wishlist") || "[]") as string[];
-            const listingId = String(listing.id);
-            const next = saved.includes(listingId)
-                ? saved.filter((itemId) => itemId !== listingId)
-                : [listingId, ...saved];
-            localStorage.setItem("bookconnect-marketplace-wishlist", JSON.stringify(next));
-            setIsWishlisted(next.includes(listingId));
-        } catch {
-            alert("Could not update wishlist. Please try again.");
+            const result = await marketplaceService.toggleWishlist(listing.id, session.user.id);
+            setIsWishlisted(result.is_wishlisted);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : "Could not update wishlist. Please try again.");
+        } finally {
+            setWishlistLoading(false);
         }
     };
 
@@ -293,16 +318,22 @@ export default function BookDetailPage() {
                         <button
                             type="button"
                             onClick={handleBuyNow}
-                            className="w-full btn-primary py-3 text-lg"
+                            disabled={buying || listing.status !== "LISTED" || listing.seller_id === session?.user?.id}
+                            className="w-full btn-primary py-3 text-lg disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            Buy Now
+                            {buying ? "Buying..." : listing.status === "SOLD" ? "Sold" : "Buy Now"}
                         </button>
                         <button
                             type="button"
                             onClick={handleToggleWishlist}
-                            className="w-full mt-3 btn-secondary py-3"
+                            disabled={wishlistLoading || listing.status === "SOLD"}
+                            className="w-full mt-3 btn-secondary py-3 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+                            {wishlistLoading
+                                ? "Updating..."
+                                : isWishlisted
+                                    ? "Remove from Wishlist"
+                                    : "Add to Wishlist"}
                         </button>
                     </div>
 

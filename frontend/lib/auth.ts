@@ -183,13 +183,18 @@ export const authOptions: NextAuthOptions = {
                 return false;
             }
         },
-        async jwt({ token, user }) {
+        async jwt({ token, user, trigger, session }) {
             if (user) {
                 token.id = user.id;
                 token.username = user.username || token.name || "reader";
                 token.email = user.email || token.email;
                 token.role = normalizeRole(user.role);
                 token.rememberMe = Boolean(user.rememberMe);
+            }
+            if (trigger === "update" && session?.user) {
+                token.username = session.user.username || token.username;
+                token.email = session.user.email || token.email;
+                token.role = normalizeRole(session.user.role || token.role);
             }
             return token;
         },

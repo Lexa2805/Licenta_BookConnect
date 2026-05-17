@@ -1,9 +1,11 @@
 import json
 import re
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from mongo_client import get_collection, serialize_document, to_object_id
 from pymongo import ReturnDocument
+from upload_storage import cloudinary_file_url, cloudinary_image_url
 
 
 BOOKS = "library_books"
@@ -29,6 +31,23 @@ def _as_int(value, default=0):
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _timezone(tz_name=None):
+    try:
+        return ZoneInfo(tz_name or "Europe/Bucharest")
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("Europe/Bucharest")
+
+
+def _as_utc(value):
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _local_date(value, tz):
+    return _as_utc(value).astimezone(tz).date()
 
 
 def _as_genres(value):
@@ -67,6 +86,10 @@ def _serialize_book(document):
     data.setdefault("pdf_url", "")
     data.setdefault("pdf_path", None)
     data.setdefault("pdf_public_id", None)
+    if data.get("cover_public_id"):
+        data["cover_url"] = cloudinary_image_url(data["cover_public_id"]) or ""
+    if data.get("pdf_public_id"):
+        data["pdf_url"] = cloudinary_file_url(data["pdf_public_id"], "raw") or ""
     data["cover_image"] = data.get("cover_url") or None
     data["pdf_file"] = data.get("pdf_url") or None
     data["cover"] = data.get("cover_url") or ""
@@ -107,10 +130,14 @@ def _book_document(data, cover_info=None, pdf_info=None, existing=None):
     existing = existing or {}
     cover_url = data.get("cover_url")
     pdf_url = data.get("pdf_url")
+    cover_public_id = existing.get("cover_public_id")
+    pdf_public_id = existing.get("pdf_public_id")
     if cover_info:
-        cover_url = cover_info["url"]
+        cover_public_id = cover_info.get("public_id")
+        cover_url = None if cover_public_id else cover_info["url"]
     if pdf_info:
-        pdf_url = pdf_info["url"]
+        pdf_public_id = pdf_info.get("public_id")
+        pdf_url = None if pdf_public_id else pdf_info["url"]
 
     return {
         "title": data.get("title", existing.get("title", "")),
@@ -119,11 +146,11 @@ def _book_document(data, cover_info=None, pdf_info=None, existing=None):
         "category": data.get("category", existing.get("category", "")) or "",
         "genres": _as_genres(data.get("genres", existing.get("genres", []))),
         "pdf_url": pdf_url if pdf_url is not None else existing.get("pdf_url", ""),
-        "pdf_path": pdf_info["path"] if pdf_info else existing.get("pdf_path"),
-        "pdf_public_id": None if pdf_info else existing.get("pdf_public_id"),
+        "pdf_path": None if pdf_info and pdf_public_id else pdf_info["path"] if pdf_info else existing.get("pdf_path"),
+        "pdf_public_id": pdf_public_id,
         "cover_url": cover_url if cover_url is not None else existing.get("cover_url", ""),
-        "cover_path": cover_info["path"] if cover_info else existing.get("cover_path"),
-        "cover_public_id": None if cover_info else existing.get("cover_public_id"),
+        "cover_path": None if cover_info and cover_public_id else cover_info["path"] if cover_info else existing.get("cover_path"),
+        "cover_public_id": cover_public_id,
         "epub_url": data.get("epub_url", existing.get("epub_url", "")) or "",
         "language": data.get("language", existing.get("language", "English")) or "English",
         "pages": _as_int(data.get("pages", existing.get("pages", 0)), 0),
@@ -348,10 +375,11 @@ def end_reading_session(session_id, end_page):
     return serialize_document(document)
 
 
-def reading_streak(user_id):
+def reading_streak(user_id, tz_name=None):
+    local_tz = _timezone(tz_name)
     cursor = get_collection(READING_SESSIONS).find({"user_id": user_id}, {"started_at": 1})
-    days = {document["started_at"].date() for document in cursor if document.get("started_at")}
-    today = datetime.now(timezone.utc).date()
+    days = {_local_date(document["started_at"], local_tz) for document in cursor if document.get("started_at")}
+    today = datetime.now(timezone.utc).astimezone(local_tz).date()
     cursor_day = today
     if cursor_day not in days and (today - timedelta(days=1)) in days:
         cursor_day = today - timedelta(days=1)
@@ -369,9 +397,12 @@ def reading_streak(user_id):
     }
 
 
-def reading_calendar(user_id, days=180):
+def reading_calendar(user_id, days=180, tz_name=None):
+    local_tz = _timezone(tz_name)
     days_int = max(1, min(_as_int(days, 180), 730))
-    start_date = datetime.now(timezone.utc) - timedelta(days=days_int - 1)
+    today = datetime.now(timezone.utc).astimezone(local_tz).date()
+    local_start = datetime.combine(today - timedelta(days=days_int - 1), datetime.min.time(), tzinfo=local_tz)
+    start_date = local_start.astimezone(timezone.utc)
     query = {
         "user_id": user_id,
         "started_at": {"$gte": start_date},
@@ -384,7 +415,7 @@ def reading_calendar(user_id, days=180):
         if not started_at:
             continue
 
-        day_key = started_at.date().isoformat()
+        day_key = _local_date(started_at, local_tz).isoformat()
         pages_read = max(0, _as_int(session.get("pages_read"), 0))
         entry = activity_by_day.setdefault(
             day_key,

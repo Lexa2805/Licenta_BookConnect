@@ -26,9 +26,11 @@ export interface LibraryBook {
     author: string;
     description: string;
     cover_url: string;
+    cover_public_id?: string | null;
     cover_image: string | null;
     cover: string;  // Computed field - returns actual cover URL
     pdf_url: string;
+    pdf_public_id?: string | null;
     pdf_file: string | null;
     pdf: string;  // Computed field - returns actual PDF URL
     epub_url: string;
@@ -116,6 +118,10 @@ export interface ReadingCalendar {
     total_sessions: number;
     active_days: number;
     range_days: number;
+}
+
+function getLocalTimeZone() {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Bucharest";
 }
 
 export const libraryService = {
@@ -296,14 +302,14 @@ export const libraryService = {
 
     getReadingStreak: async (userId: string) => {
         const response = await api.get('/api/library/reading-sessions/streak/', {
-            params: { user_id: userId },
+            params: { user_id: userId, timezone: getLocalTimeZone() },
         });
         return response.data as ReadingStreak;
     },
 
     getReadingCalendar: async (userId: string, days = 180) => {
         const response = await api.get('/api/library/reading-sessions/calendar/', {
-            params: { user_id: userId, days },
+            params: { user_id: userId, days, timezone: getLocalTimeZone() },
         });
         return response.data as ReadingCalendar;
     },

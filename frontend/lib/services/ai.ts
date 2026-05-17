@@ -34,9 +34,16 @@ export interface MovieMatchResult {
   movies: MovieMatch[];
 }
 
+type OpenRouterMessageContent =
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    >;
+
 interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: OpenRouterMessageContent;
 }
 
 interface OpenRouterChoice {
@@ -436,6 +443,72 @@ Find 5 movie matches for this work.`;
 
   return {
     summary: parsed.summary || "Movie matches generated from the supplied text.",
+    movies: movies.slice(0, 5).map((movie) => ({
+      title: movie.title,
+      year: movie.year,
+      match_score: Math.max(0, Math.min(100, Number(movie.match_score) || 0)),
+      reason: movie.reason,
+      shared_elements: Array.isArray(movie.shared_elements)
+        ? movie.shared_elements.slice(0, 4)
+        : [],
+    })),
+  };
+}
+
+export async function findMovieMatchesFromImage(
+  imageUrl: string,
+  title: string = "",
+  genre: string = "",
+): Promise<MovieMatchResult> {
+  const systemPrompt = `You are a film comparison assistant for readers.
+Given an image of a book cover, page, or synopsis, first infer any readable title, author, genre clues, and visible text. Then recommend real movies that share tone, themes, setting, character dynamics, or story signals.
+
+Important:
+- Do not claim the book is copied from a movie.
+- Do not invent movies. Recommend real, known films only.
+- If the image has little readable story information, say the matches are tentative.
+- Return only JSON in this exact shape:
+{
+  "summary": "Brief comparison summary that mentions what you could infer from the image",
+  "movies": [
+    {
+      "title": "Movie title",
+      "year": "YYYY",
+      "match_score": 0-100,
+      "reason": "Why this movie matches",
+      "shared_elements": ["element", "element", "element"]
+    }
+  ]
+}`;
+
+  const raw = await callOpenRouter(
+    [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Book/manuscript title hint: ${title || "Unknown"}
+Genre hint: ${genre || "Unknown"}
+
+Scan this image and find 5 movie matches.`,
+          },
+          {
+            type: "image_url",
+            image_url: { url: imageUrl },
+          },
+        ],
+      },
+    ],
+    0.45,
+  );
+
+  const parsed = parseJsonFromLLM<MovieMatchResult>(raw);
+  const movies = Array.isArray(parsed.movies) ? parsed.movies : [];
+
+  return {
+    summary: parsed.summary || "Movie matches generated from the uploaded image.",
     movies: movies.slice(0, 5).map((movie) => ({
       title: movie.title,
       year: movie.year,

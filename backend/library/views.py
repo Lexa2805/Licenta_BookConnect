@@ -342,7 +342,7 @@ class ReadingSessionViewSet(viewsets.ViewSet):
         user_id = request.query_params.get('user_id')
         if not user_id:
             return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(mongo_service.reading_streak(user_id))
+        return Response(mongo_service.reading_streak(user_id, request.query_params.get('timezone')))
 
     @action(detail=False, methods=['get'], url_path='calendar')
     def calendar(self, request):
@@ -350,4 +350,10 @@ class ReadingSessionViewSet(viewsets.ViewSet):
         user_id = request.query_params.get('user_id')
         if not user_id:
             return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(mongo_service.reading_calendar(user_id, request.query_params.get('days', 180)))
+        return Response(
+            mongo_service.reading_calendar(
+                user_id,
+                request.query_params.get('days', 180),
+                request.query_params.get('timezone'),
+            )
+        )

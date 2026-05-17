@@ -2,10 +2,13 @@ from datetime import datetime, timezone
 
 from mongo_client import get_collection, serialize_document, to_object_id
 from pymongo import ReturnDocument
+from upload_storage import cloudinary_image_url
 
 
 LISTINGS = "marketplace_listings"
 REVIEWS = "marketplace_reviews"
+WISHLIST = "marketplace_wishlist"
+PURCHASES = "marketplace_purchases"
 
 GENRE_CHOICES = [
     ("FANTASY", "Fantasy"),
@@ -66,10 +69,15 @@ def _serialize_listing(document, include_reviews=False):
     data.setdefault("language", "RO")
     data.setdefault("pages", 0)
     data.setdefault("status", "LISTED")
+    data.setdefault("buyer_id", None)
+    data.setdefault("buyer_name", None)
+    data.setdefault("sold_at", None)
     data.setdefault("image_url", None)
     data.setdefault("image_path", None)
     data.setdefault("image_public_id", None)
-    data["image"] = data.get("image_path")
+    if data.get("image_public_id"):
+        data["image_url"] = cloudinary_image_url(data["image_public_id"])
+    data["image"] = data.get("image_url") or data.get("image_path")
     data["average_rating"] = average
     data["review_count"] = count
     if include_reviews:
@@ -96,6 +104,42 @@ def get_listing(listing_id):
     return _serialize_listing(document, include_reviews=True) if document else None
 
 
+def list_wishlist(user_id):
+    wishlist_docs = list(get_collection(WISHLIST).find({"user_id": user_id}).sort("created_at", -1))
+    listing_ids = [to_object_id(item.get("listing_id")) for item in wishlist_docs]
+    listing_ids = [item for item in listing_ids if item is not None]
+    if not listing_ids:
+        return []
+
+    documents = list(get_collection(LISTINGS).find({"_id": {"$in": listing_ids}}))
+    listing_by_id = {str(document["_id"]): _serialize_listing(document) for document in documents}
+    return [listing_by_id[item.get("listing_id")] for item in wishlist_docs if item.get("listing_id") in listing_by_id]
+
+
+def is_wishlisted(user_id, listing_id):
+    return bool(get_collection(WISHLIST).find_one({"user_id": user_id, "listing_id": str(listing_id)}))
+
+
+def set_wishlist(user_id, listing_id, desired=None):
+    listing = get_listing(listing_id)
+    if not listing:
+        return None
+
+    query = {"user_id": user_id, "listing_id": str(listing_id)}
+    exists = bool(get_collection(WISHLIST).find_one(query))
+    should_add = (not exists) if desired is None else bool(desired)
+
+    if should_add and not exists:
+        get_collection(WISHLIST).insert_one({**query, "created_at": _now()})
+    elif not should_add and exists:
+        get_collection(WISHLIST).delete_one(query)
+
+    return {
+        "is_wishlisted": should_add,
+        "listing": listing,
+    }
+
+
 def create_listing(data, image_info=None):
     now = _now()
     document = {
@@ -110,9 +154,9 @@ def create_listing(data, image_info=None):
         "seller_id": data.get("seller_id") or "anonymous_seller",
         "seller_name": data.get("seller_name") or "Anonymous Seller",
         "status": data.get("status") or "LISTED",
-        "image_url": image_info["url"] if image_info else None,
-        "image_path": image_info["path"] if image_info else None,
-        "image_public_id": None,
+        "image_url": None if image_info and image_info.get("public_id") else image_info["url"] if image_info else None,
+        "image_path": None if image_info and image_info.get("public_id") else image_info["path"] if image_info else None,
+        "image_public_id": image_info.get("public_id") if image_info else None,
         "created_at": now,
         "updated_at": now,
     }
@@ -147,9 +191,9 @@ def update_listing(listing_id, data, image_info=None):
     if image_info:
         updates.update(
             {
-                "image_url": image_info["url"],
-                "image_path": image_info["path"],
-                "image_public_id": None,
+                "image_url": None if image_info.get("public_id") else image_info["url"],
+                "image_path": None if image_info.get("public_id") else image_info["path"],
+                "image_public_id": image_info.get("public_id"),
             }
         )
     updates["updated_at"] = _now()
@@ -162,6 +206,52 @@ def update_listing(listing_id, data, image_info=None):
     return _serialize_listing(document, include_reviews=True) if document else None
 
 
+def purchase_listing(listing_id, user_id, buyer_name=None):
+    object_id = to_object_id(listing_id)
+    if object_id is None:
+        return None, "Listing not found."
+
+    listing = get_collection(LISTINGS).find_one({"_id": object_id})
+    if not listing:
+        return None, "Listing not found."
+
+    if listing.get("seller_id") == user_id:
+        return None, "You cannot buy your own listing."
+
+    if listing.get("status", "LISTED") != "LISTED":
+        return None, "This listing is no longer available."
+
+    now = _now()
+    updates = {
+        "status": "SOLD",
+        "buyer_id": user_id,
+        "buyer_name": buyer_name or "Anonymous Buyer",
+        "sold_at": now,
+        "updated_at": now,
+    }
+    document = get_collection(LISTINGS).find_one_and_update(
+        {"_id": object_id, "status": "LISTED"},
+        {"$set": updates},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not document:
+        return None, "This listing is no longer available."
+
+    get_collection(PURCHASES).insert_one(
+        {
+            "listing_id": str(listing_id),
+            "buyer_id": user_id,
+            "buyer_name": buyer_name or "Anonymous Buyer",
+            "seller_id": document.get("seller_id"),
+            "seller_name": document.get("seller_name"),
+            "price": document.get("price", 0.0),
+            "created_at": now,
+        }
+    )
+    get_collection(WISHLIST).delete_one({"user_id": user_id, "listing_id": str(listing_id)})
+    return _serialize_listing(document, include_reviews=True), None
+
+
 def delete_listing(listing_id):
     object_id = to_object_id(listing_id)
     if object_id is None:
@@ -169,6 +259,7 @@ def delete_listing(listing_id):
     result = get_collection(LISTINGS).delete_one({"_id": object_id})
     if result.deleted_count:
         get_collection(REVIEWS).delete_many({"listing": str(listing_id)})
+        get_collection(WISHLIST).delete_many({"listing_id": str(listing_id)})
     return bool(result.deleted_count)
 
 

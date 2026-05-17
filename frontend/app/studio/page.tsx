@@ -4,21 +4,16 @@ import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } fr
 import {
   AlertCircle,
   Bot,
-  Book,
-  Clapperboard,
   FileText,
-  Film,
   Globe2,
   ImageIcon,
   Lock,
   Loader2,
   MessageSquare,
-  Package,
   Plus,
   RefreshCcw,
   Send,
   Sparkles,
-  Star,
   Trash2,
   Upload,
   User,
@@ -27,21 +22,17 @@ import {
 } from "lucide-react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/Button";
-import { StatCard } from "@/components/stats/StatCard";
 import { SectionHeader } from "@/components/ui/SectionTitle";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import { manuscriptsService } from "@/lib/services/manuscripts";
 import { marketplaceService } from "@/lib/services/marketplace";
 import {
-  findMovieMatches,
   generateCustomCover,
   type CustomCoverResult,
-  type MovieMatchResult,
 } from "@/lib/services/ai";
 import { useRouter } from "next/navigation";
 
-const RANGES = ["7d", "30d", "90d", "All"];
 const AI_ENDPOINT = "http://127.0.0.1:8000/ai/generate/";
 
 type AiMode = "correct" | "continue";
@@ -71,7 +62,6 @@ const AI_MODES: Record<AiMode, { label: string; Icon: typeof Wand2 }> = {
 };
 
 export default function StudioPage() {
-  const [range, setRange] = useState("30d");
   const { data: session } = useSession();
   const router = useRouter();
   const userId = session?.user?.id as string | undefined;
@@ -90,12 +80,6 @@ export default function StudioPage() {
     enabled: !!userId,
   });
 
-  const publishedManuscripts = manuscripts.filter((m: any) => m.status === "published" || m.status === "PUBLISHED");
-  const draftManuscripts = manuscripts.filter((m: any) => m.status === "draft" || m.status === "DRAFT");
-  
-  const totalListings = myListings.length;
-  const activeListings = myListings.filter((l: any) => l.status === "LISTED" || l.status === "listed" || l.status === "AVAILABLE" || l.status === "available").length;
-  
   const loading = loadingManuscripts || loadingListings;
 
   function getErrorMessage(err: unknown, fallback: string) {
@@ -215,67 +199,6 @@ export default function StudioPage() {
 
       <WriterCreativeTools manuscripts={manuscripts} />
 
-      <section className="bc-stagger grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Active listings"
-          value={loading ? "..." : activeListings.toString()}
-          Icon={Package}
-          trendColor="muted"
-          trend={`${totalListings} total listings`}
-        />
-        <StatCard
-          label="Published Works"
-          value={loading ? "..." : publishedManuscripts.length.toString()}
-          Icon={Book}
-          trendColor="success"
-          trend="Live in library"
-        />
-        <StatCard
-          label="Drafts"
-          value={loading ? "..." : draftManuscripts.length.toString()}
-          Icon={FileText}
-          trendColor="warning"
-          trend="In progress"
-        />
-        <StatCard
-          label="Avg Rating"
-          value={loading ? "..." : "0.0"}
-          Icon={Star}
-          trendColor="muted"
-          trend="Not enough data"
-        />
-      </section>
-
-      <section className="bc-card p-6">
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-          <SectionHeader title="Earnings over time" />
-          <div className="flex gap-1 bg-bc-surface-muted p-1 rounded-full">
-            {RANGES.map((r) => (
-              <button
-                key={r}
-                onClick={() => setRange(r)}
-                className={[
-                  "px-3.5 h-8 rounded-full text-[12.5px] font-semibold transition-all",
-                  r === range
-                    ? "bg-bc-surface text-bc-primary shadow-bc-sm"
-                    : "text-bc-subtext hover:text-bc-text",
-                ].join(" ")}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        </div>
-        <EarningsChart />
-        <div className="flex items-center justify-between mt-4 px-1 text-[11px] text-bc-subtext font-medium">
-          {["Aug 1", "Aug 6", "Aug 11", "Aug 16", "Aug 21", "Aug 26", "Aug 31"].map(
-            (d) => (
-              <span key={d}>{d}</span>
-            ),
-          )}
-        </div>
-      </section>
-
       <section className="grid md:grid-cols-2 gap-6">
         <div>
           <SectionHeader title="Your Manuscripts" />
@@ -366,13 +289,6 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
   const [coverResult, setCoverResult] = useState<CustomCoverResult | null>(null);
   const [coverLoading, setCoverLoading] = useState(false);
   const [coverError, setCoverError] = useState("");
-  const [movieTitle, setMovieTitle] = useState("");
-  const [movieGenre, setMovieGenre] = useState("");
-  const [movieText, setMovieText] = useState("");
-  const [movieResult, setMovieResult] = useState<MovieMatchResult | null>(null);
-  const [movieLoading, setMovieLoading] = useState(false);
-  const [movieError, setMovieError] = useState("");
-  const movieFileRef = useRef<HTMLInputElement | null>(null);
 
   function applyManuscript(manuscriptId: string) {
     setSelectedManuscriptId(manuscriptId);
@@ -383,12 +299,8 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
     const content = manuscript.content || "";
     setCoverTitle(title);
     setCoverDescription(content.slice(0, 4000));
-    setMovieTitle(title);
-    setMovieText(content);
     setCoverResult(null);
-    setMovieResult(null);
     setCoverError("");
-    setMovieError("");
   }
 
   async function handleGenerateCover() {
@@ -415,47 +327,8 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
     }
   }
 
-  async function handleFindMovies() {
-    const text = movieText.trim();
-    if (!text) {
-      setMovieError("Paste text, upload a .txt file, or choose a manuscript first.");
-      return;
-    }
-
-    setMovieLoading(true);
-    setMovieError("");
-    try {
-      const result = await findMovieMatches(movieTitle.trim(), text, movieGenre.trim());
-      setMovieResult(result);
-    } catch (err) {
-      setMovieError(err instanceof Error ? err.message : "Could not find movie matches.");
-    } finally {
-      setMovieLoading(false);
-    }
-  }
-
-  async function handleMovieFileUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    const isTextFile = file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt");
-    if (!isTextFile) {
-      setMovieError("For now, movie scanning can read .txt files. Paste text from PDFs or DOCX files into the box.");
-      return;
-    }
-
-    const text = await file.text();
-    setMovieText(text.trim());
-    if (!movieTitle.trim()) {
-      setMovieTitle(file.name.replace(/\.[^/.]+$/, ""));
-    }
-    setMovieResult(null);
-    setMovieError("");
-  }
-
   return (
-    <section className="grid gap-6 xl:grid-cols-2">
+    <section className="grid gap-6">
       <div className="bc-card overflow-hidden">
         <div className="border-b border-bc-border bg-bc-surface-2 px-5 py-4">
           <div className="flex items-center gap-3">
@@ -547,108 +420,6 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
         </div>
       </div>
 
-      <div className="bc-card overflow-hidden">
-        <div className="border-b border-bc-border bg-bc-surface-2 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-bc-md bg-bc-primary-soft text-bc-primary">
-              <Clapperboard size={20} />
-            </div>
-            <div>
-              <h2 className="text-base font-bold tracking-tight text-bc-text">Find your movie</h2>
-              <p className="text-[13px] text-bc-subtext">Scan a manuscript excerpt and get movie comparisons.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-5 p-5 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="space-y-3">
-            <ManuscriptSelect
-              value={selectedManuscriptId}
-              manuscripts={manuscripts}
-              onChange={applyManuscript}
-            />
-            <TextInput label="Title" value={movieTitle} onChange={setMovieTitle} placeholder="Manuscript title" />
-            <TextInput label="Genre" value={movieGenre} onChange={setMovieGenre} placeholder="Mystery, sci-fi, literary..." />
-            <TextArea
-              label="Text to scan"
-              value={movieText}
-              onChange={setMovieText}
-              placeholder="Paste a synopsis, chapter, or full text excerpt..."
-              rows={10}
-            />
-            <input
-              ref={movieFileRef}
-              type="file"
-              accept=".txt,text/plain"
-              onChange={handleMovieFileUpload}
-              className="hidden"
-            />
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                fullWidth
-                onClick={() => movieFileRef.current?.click()}
-                leftIcon={<Upload size={14} />}
-              >
-                Upload .txt
-              </Button>
-              <Button
-                type="button"
-                fullWidth
-                disabled={movieLoading}
-                onClick={handleFindMovies}
-                leftIcon={movieLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film size={14} />}
-              >
-                {movieLoading ? "Scanning..." : "Find movies"}
-              </Button>
-            </div>
-            {movieError && <ToolError message={movieError} />}
-          </div>
-
-          <div className="rounded-bc-lg border border-bc-border bg-bc-surface-muted p-4">
-            {movieResult ? (
-              <div>
-                <p className="mb-4 text-sm leading-6 text-bc-text-soft">{movieResult.summary}</p>
-                <div className="space-y-3">
-                  {movieResult.movies.map((movie) => (
-                    <article key={`${movie.title}-${movie.year}`} className="rounded-bc-md border border-bc-border bg-bc-surface p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="text-sm font-bold text-bc-text">
-                            {movie.title} {movie.year ? <span className="text-bc-subtext">({movie.year})</span> : null}
-                          </h3>
-                          <p className="mt-2 text-xs leading-5 text-bc-text-soft">{movie.reason}</p>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-bc-primary-soft px-2.5 py-1 text-xs font-bold text-bc-primary">
-                          {movie.match_score}%
-                        </span>
-                      </div>
-                      {movie.shared_elements.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {movie.shared_elements.map((element) => (
-                            <span key={element} className="rounded-full border border-bc-border bg-bc-surface-muted px-2 py-1 text-[11px] text-bc-subtext">
-                              {element}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="grid h-full min-h-[360px] place-items-center text-center">
-                <div>
-                  <Clapperboard className="mx-auto mb-3 h-10 w-10 text-bc-subtext" />
-                  <p className="text-sm font-semibold text-bc-text">Movie matches appear here</p>
-                  <p className="mt-1 text-sm text-bc-subtext">The scan compares tone, themes, setting, and character dynamics.</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
     </section>
   );
 }
@@ -1227,55 +998,6 @@ function ChatBubble({ message }: { message: ChatMessage }) {
           <User size={16} />
         </div>
       )}
-    </div>
-  );
-}
-
-/* Inline SVG line chart */
-function EarningsChart() {
-  // y values 0-100, x evenly spaced
-  const points = [22, 28, 24, 36, 30, 42, 50, 46, 58, 54, 62, 70, 66, 78];
-  const w = 100;
-  const h = 40;
-  const stepX = w / (points.length - 1);
-  const max = 100;
-  const path = points
-    .map((p, i) => {
-      const x = i * stepX;
-      const y = h - (p / max) * h;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
-  const area = `${path} L${w},${h} L0,${h} Z`;
-  return (
-    <div className="w-full h-56 relative">
-      <svg
-        viewBox={`0 0 ${w} ${h}`}
-        preserveAspectRatio="none"
-        className="w-full h-full"
-      >
-        <defs>
-          <linearGradient id="bcEarnArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--bc-primary)" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="var(--bc-primary)" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="bcEarnLine" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="var(--bc-primary-grad-from)" />
-            <stop offset="100%" stopColor="var(--bc-primary-grad-to)" />
-          </linearGradient>
-        </defs>
-        <path d={area} fill="url(#bcEarnArea)" />
-        <path
-          d={path}
-          fill="none"
-          stroke="url(#bcEarnLine)"
-          strokeWidth="0.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-          style={{ strokeWidth: 2.2 }}
-        />
-      </svg>
     </div>
   );
 }

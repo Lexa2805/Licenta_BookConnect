@@ -774,8 +774,12 @@ export default function CommunityPage() {
                                   : "border-bc-border",
                               ].join(" ")}
                             >
-                              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-bc-primary-soft text-sm font-bold text-bc-primary">
-                                {getInitials(user.username)}
+                              <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-bc-primary-soft text-sm font-bold text-bc-primary">
+                                {user.profile?.avatar_url ? (
+                                  <img src={user.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  getInitials(user.username)
+                                )}
                               </div>
                               <button
                                 type="button"
@@ -792,6 +796,12 @@ export default function CommunityPage() {
                               >
                                 Message
                               </button>
+                              <a
+                                href={`/profile/${user.id}`}
+                                className="shrink-0 rounded-bc-md border border-bc-border bg-bc-surface px-3 py-1.5 text-[12px] font-bold text-bc-text-soft transition hover:border-bc-primary/40 hover:text-bc-primary"
+                              >
+                                Profile
+                              </a>
                             </div>
                           ))}
                           {users.length > 5 && (

@@ -24,6 +24,9 @@ export interface Listing {
     seller_id: string;
     seller_name: string;
     status: string;
+    buyer_id?: string | null;
+    buyer_name?: string | null;
+    sold_at?: string | null;
     image: string | null;
     image_url: string | null;
     average_rating: number;
@@ -57,6 +60,28 @@ export const marketplaceService = {
 
     getMyListings: async (sellerId: string): Promise<Listing[]> => {
         const response = await api.get(`/api/marketplace/listings/my_listings/?seller_id=${sellerId}`);
+        return response.data;
+    },
+
+    getWishlist: async (userId: string): Promise<Listing[]> => {
+        const response = await api.get(`/api/marketplace/listings/wishlist/?user_id=${userId}`);
+        return response.data;
+    },
+
+    getWishlistStatus: async (id: string | number, userId: string): Promise<{ is_wishlisted: boolean }> => {
+        const response = await api.get(`/api/marketplace/listings/${id}/wishlist_status/?user_id=${userId}`);
+        return response.data;
+    },
+
+    toggleWishlist: async (id: string | number, userId: string): Promise<{ is_wishlisted: boolean; listing: Listing }> => {
+        const response = await api.post(`/api/marketplace/listings/${id}/toggle_wishlist/`, {
+            user_id: userId,
+        });
+        return response.data;
+    },
+
+    buyNow: async (id: string | number, data: { user_id: string; buyer_name?: string }): Promise<Listing> => {
+        const response = await api.post(`/api/marketplace/listings/${id}/buy_now/`, data);
         return response.data;
     },
 

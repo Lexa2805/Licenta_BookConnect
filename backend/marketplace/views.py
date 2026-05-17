@@ -116,6 +116,46 @@ class ListingViewSet(viewsets.ViewSet):
             return Response({'error': 'seller_id is required'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(mongo_service.list_listings(seller_id=seller_id))
 
+    @action(detail=False, methods=['get'])
+    def wishlist(self, request):
+        """Return marketplace wishlist for a specific user."""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(mongo_service.list_wishlist(user_id))
+
+    @action(detail=True, methods=['get'])
+    def wishlist_status(self, request, pk=None):
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'is_wishlisted': mongo_service.is_wishlisted(user_id, pk)})
+
+    @action(detail=True, methods=['post'])
+    def toggle_wishlist(self, request, pk=None):
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        result = mongo_service.set_wishlist(user_id, pk)
+        if not result:
+            return Response({'detail': 'Listing not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(result)
+
+    @action(detail=True, methods=['post'])
+    def buy_now(self, request, pk=None):
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        listing, error = mongo_service.purchase_listing(
+            pk,
+            user_id,
+            request.data.get('buyer_name'),
+        )
+        if error:
+            status_code = status.HTTP_404_NOT_FOUND if error == 'Listing not found.' else status.HTTP_400_BAD_REQUEST
+            return Response({'detail': error}, status=status_code)
+        return Response(listing)
+
 
 class ReviewViewSet(viewsets.ViewSet):
     parser_classes = [FormParser, JSONParser]
