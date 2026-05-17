@@ -367,3 +367,61 @@ def reading_streak(user_id):
         "last_read_date": max(days).isoformat() if days else None,
         "tracked_days": len(days),
     }
+
+
+def reading_calendar(user_id, days=180):
+    days_int = max(1, min(_as_int(days, 180), 730))
+    start_date = datetime.now(timezone.utc) - timedelta(days=days_int - 1)
+    query = {
+        "user_id": user_id,
+        "started_at": {"$gte": start_date},
+    }
+    cursor = get_collection(READING_SESSIONS).find(query).sort("started_at", 1)
+    activity_by_day = {}
+
+    for session in cursor:
+        started_at = session.get("started_at")
+        if not started_at:
+            continue
+
+        day_key = started_at.date().isoformat()
+        pages_read = max(0, _as_int(session.get("pages_read"), 0))
+        entry = activity_by_day.setdefault(
+            day_key,
+            {
+                "date": day_key,
+                "pages_read": 0,
+                "sessions": 0,
+                "books": set(),
+            },
+        )
+        entry["pages_read"] += pages_read
+        entry["sessions"] += 1
+        if session.get("book"):
+            entry["books"].add(str(session.get("book")))
+
+    days_data = []
+    total_pages = 0
+    total_sessions = 0
+    for day_key in sorted(activity_by_day):
+        entry = activity_by_day[day_key]
+        pages_read = entry["pages_read"]
+        sessions = entry["sessions"]
+        total_pages += pages_read
+        total_sessions += sessions
+        days_data.append(
+            {
+                "date": day_key,
+                "pages_read": pages_read,
+                "sessions": sessions,
+                "book_count": len(entry["books"]),
+            }
+        )
+
+    return {
+        "days": days_data,
+        "total_pages": total_pages,
+        "total_sessions": total_sessions,
+        "active_days": len(days_data),
+        "range_days": days_int,
+    }

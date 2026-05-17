@@ -103,6 +103,21 @@ export interface ReadingStreak {
     tracked_days: number;
 }
 
+export interface ReadingCalendarDay {
+    date: string;
+    pages_read: number;
+    sessions: number;
+    book_count: number;
+}
+
+export interface ReadingCalendar {
+    days: ReadingCalendarDay[];
+    total_pages: number;
+    total_sessions: number;
+    active_days: number;
+    range_days: number;
+}
+
 export const libraryService = {
     // Library Books (Admin)
     getBooks: async (params?: { search?: string; genre?: string; featured?: boolean; is_free?: boolean }) => {
@@ -284,5 +299,12 @@ export const libraryService = {
             params: { user_id: userId },
         });
         return response.data as ReadingStreak;
+    },
+
+    getReadingCalendar: async (userId: string, days = 180) => {
+        const response = await api.get('/api/library/reading-sessions/calendar/', {
+            params: { user_id: userId, days },
+        });
+        return response.data as ReadingCalendar;
     },
 };

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { normalizeRole } from "@/lib/roles";
 
 export async function GET() {
     try {
@@ -17,7 +18,7 @@ export async function GET() {
             id: session.user.id,
             username: session.user.username,
             email: session.user.email,
-            role: session.user.role,
+            role: normalizeRole(session.user.role),
         });
     } catch (error: any) {
         return NextResponse.json(

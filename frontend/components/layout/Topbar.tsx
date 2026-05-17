@@ -7,6 +7,7 @@ import { useSession, signOut } from "next-auth/react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { canReadLibrary } from "@/lib/roles";
 
 export function Topbar() {
   const { data: session } = useSession();
@@ -17,15 +18,20 @@ export function Topbar() {
   const username =
     session?.user?.username || session?.user?.email?.split("@")[0] || "BookConnect";
   const initials = username.substring(0, 2).toUpperCase();
+  const searchLibrary = canReadLibrary(session?.user?.role);
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const query = search.trim();
 
     if (query) {
-      router.push(`/library?search=${encodeURIComponent(query)}`);
+      router.push(
+        searchLibrary
+          ? `/library?search=${encodeURIComponent(query)}`
+          : `/marketplace?search=${encodeURIComponent(query)}`,
+      );
     } else {
-      router.push("/library");
+      router.push(searchLibrary ? "/library" : "/marketplace");
     }
   }
 
@@ -35,7 +41,7 @@ export function Topbar() {
         <form onSubmit={handleSearchSubmit} className="flex-1 max-w-xl">
           <Input
             inputSize="sm"
-            placeholder="Search books, authors, members..."
+            placeholder={searchLibrary ? "Search books, authors, members..." : "Search listings, authors, members..."}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             leftIcon={<Search size={15} />}

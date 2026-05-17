@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import bcrypt from "bcryptjs";
+import { isSelectableAccountRole } from "@/lib/roles";
 
 export async function POST(request: Request) {
     try {
@@ -11,6 +12,13 @@ export async function POST(request: Request) {
         if (!username || !email || !password) {
             return NextResponse.json(
                 { detail: "Username, email and password are required" },
+                { status: 400 }
+            );
+        }
+
+        if (!role || typeof role !== "string" || !isSelectableAccountRole(role)) {
+            return NextResponse.json(
+                { detail: "Select whether this account is for reading, writing, or both" },
                 { status: 400 }
             );
         }
@@ -54,7 +62,7 @@ export async function POST(request: Request) {
             username,
             email: email.toLowerCase(),
             password: hashedPassword,
-            role: role || "reader",
+            role,
             is_active: true,
             createdAt: new Date().toISOString(),
             purchasedBooks: [],

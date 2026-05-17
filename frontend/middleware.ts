@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { canReadLibrary, canUseStudio, getDefaultPathForRole, normalizeRole } from "./lib/roles";
 
 const PUBLIC_APP_PATHS = ["/login", "/register", "/reset-password"];
 const PUBLIC_API_PREFIXES = [
@@ -16,6 +17,9 @@ const AUTH_COOKIE_NAMES = [
   "bc_remember",
   "bc_session",
 ];
+
+const READER_PATH_PREFIXES = ["/library", "/books", "/manuscripts", "/community", "/api/pdf"];
+const WRITER_PATH_PREFIXES = ["/studio"];
 
 function isPublicPath(pathname: string) {
   return (
@@ -57,6 +61,21 @@ function unauthorizedResponse(request: NextRequest) {
   return redirectToLogin(request);
 }
 
+function matchesPrefix(pathname: string, prefixes: string[]) {
+  return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function forbiddenResponse(request: NextRequest, role?: string | null) {
+  if (request.nextUrl.pathname.startsWith("/api")) {
+    return NextResponse.json(
+      { detail: "Your account type cannot access this area" },
+      { status: 403 },
+    );
+  }
+
+  return NextResponse.redirect(new URL(getDefaultPathForRole(role), request.url));
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = await getToken({
@@ -78,7 +97,17 @@ export async function middleware(request: NextRequest) {
   }
 
   if (PUBLIC_APP_PATHS.includes(pathname)) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL(getDefaultPathForRole(token.role as string), request.url));
+  }
+
+  const role = normalizeRole(token.role as string | undefined);
+
+  if (matchesPrefix(pathname, READER_PATH_PREFIXES) && !canReadLibrary(role)) {
+    return forbiddenResponse(request, role);
+  }
+
+  if (matchesPrefix(pathname, WRITER_PATH_PREFIXES) && !canUseStudio(role)) {
+    return forbiddenResponse(request, role);
   }
 
   return NextResponse.next();

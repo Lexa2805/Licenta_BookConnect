@@ -2,12 +2,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import type { SelectableAccountRole } from "@/lib/roles";
 
 export default function RegisterPage() {
   const [username, setU] = useState("");
   const [email, setE] = useState("");
   const [password, setP] = useState("");
-  const [role, setR] = useState<"reader" | "author">("reader");
+  const [role, setR] = useState<SelectableAccountRole | "">("");
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -120,10 +121,13 @@ export default function RegisterPage() {
               <select
                 className="w-full bg-bc-surface-muted border border-bc-border rounded-bc-md px-4 py-3 text-bc-text outline-none focus:border-bc-primary focus:ring-1 focus:ring-bc-primary transition cursor-pointer"
                 value={role}
-                onChange={(e) => setR(e.target.value as any)}
+                onChange={(e) => setR(e.target.value as SelectableAccountRole | "")}
+                required
               >
-                <option value="reader" className="bg-bc-surface text-bc-text">📚 Reader - Discover and read books</option>
-                <option value="author" className="bg-bc-surface text-bc-text">✍️ Author - Write and publish</option>
+                <option value="" className="bg-bc-surface text-bc-text">Select how you want to use BookConnect</option>
+                <option value="reader" className="bg-bc-surface text-bc-text">Reader - discover books and public manuscripts</option>
+                <option value="writer" className="bg-bc-surface text-bc-text">Writer - use Studio and Marketplace</option>
+                <option value="both" className="bg-bc-surface text-bc-text">Both - read, write, and sell</option>
               </select>
             </div>
 

@@ -17,7 +17,7 @@ def generate_text(request):
         mode = data.get("mode", "continue")
 
         result = run_ai(text, mode)
-
         return JsonResponse({"result": result})
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

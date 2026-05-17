@@ -5,8 +5,11 @@ import {
   AlertCircle,
   Bot,
   Book,
+  Clapperboard,
   FileText,
+  Film,
   Globe2,
+  ImageIcon,
   Lock,
   Loader2,
   MessageSquare,
@@ -30,6 +33,12 @@ import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import { manuscriptsService } from "@/lib/services/manuscripts";
 import { marketplaceService } from "@/lib/services/marketplace";
+import {
+  findMovieMatches,
+  generateCustomCover,
+  type CustomCoverResult,
+  type MovieMatchResult,
+} from "@/lib/services/ai";
 import { useRouter } from "next/navigation";
 
 const RANGES = ["7d", "30d", "90d", "All"];
@@ -50,15 +59,13 @@ type ChatConversation = {
   updatedAt: string;
 };
 
-const AI_MODES: Record<AiMode, { label: string; promptPrefix: string; Icon: typeof Wand2 }> = {
+const AI_MODES: Record<AiMode, { label: string; Icon: typeof Wand2 }> = {
   correct: {
     label: "Correct Text",
-    promptPrefix: "Correct this text grammatically: ",
     Icon: Wand2,
   },
   continue: {
     label: "Continue Text",
-    promptPrefix: "Continue this story naturally: ",
     Icon: RefreshCcw,
   },
 };
@@ -206,6 +213,8 @@ export default function StudioPage() {
     >
       <StudioAiChat userId={userId} />
 
+      <WriterCreativeTools manuscripts={manuscripts} />
+
       <section className="bc-stagger grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Active listings"
@@ -348,6 +357,396 @@ export default function StudioPage() {
   );
 }
 
+function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
+  const [selectedManuscriptId, setSelectedManuscriptId] = useState("");
+  const [coverTitle, setCoverTitle] = useState("");
+  const [coverGenre, setCoverGenre] = useState("");
+  const [coverDescription, setCoverDescription] = useState("");
+  const [coverDirection, setCoverDirection] = useState("");
+  const [coverResult, setCoverResult] = useState<CustomCoverResult | null>(null);
+  const [coverLoading, setCoverLoading] = useState(false);
+  const [coverError, setCoverError] = useState("");
+  const [movieTitle, setMovieTitle] = useState("");
+  const [movieGenre, setMovieGenre] = useState("");
+  const [movieText, setMovieText] = useState("");
+  const [movieResult, setMovieResult] = useState<MovieMatchResult | null>(null);
+  const [movieLoading, setMovieLoading] = useState(false);
+  const [movieError, setMovieError] = useState("");
+  const movieFileRef = useRef<HTMLInputElement | null>(null);
+
+  function applyManuscript(manuscriptId: string) {
+    setSelectedManuscriptId(manuscriptId);
+    const manuscript = manuscripts.find((item) => String(item.id) === manuscriptId);
+    if (!manuscript) return;
+
+    const title = manuscript.title || "";
+    const content = manuscript.content || "";
+    setCoverTitle(title);
+    setCoverDescription(content.slice(0, 4000));
+    setMovieTitle(title);
+    setMovieText(content);
+    setCoverResult(null);
+    setMovieResult(null);
+    setCoverError("");
+    setMovieError("");
+  }
+
+  async function handleGenerateCover() {
+    const description = coverDescription.trim();
+    if (!coverTitle.trim() && !description) {
+      setCoverError("Add a title, synopsis, or choose a manuscript first.");
+      return;
+    }
+
+    setCoverLoading(true);
+    setCoverError("");
+    try {
+      const result = await generateCustomCover(
+        coverTitle.trim(),
+        coverGenre.trim(),
+        description,
+        coverDirection.trim(),
+      );
+      setCoverResult(result);
+    } catch (err) {
+      setCoverError(err instanceof Error ? err.message : "Could not generate a cover.");
+    } finally {
+      setCoverLoading(false);
+    }
+  }
+
+  async function handleFindMovies() {
+    const text = movieText.trim();
+    if (!text) {
+      setMovieError("Paste text, upload a .txt file, or choose a manuscript first.");
+      return;
+    }
+
+    setMovieLoading(true);
+    setMovieError("");
+    try {
+      const result = await findMovieMatches(movieTitle.trim(), text, movieGenre.trim());
+      setMovieResult(result);
+    } catch (err) {
+      setMovieError(err instanceof Error ? err.message : "Could not find movie matches.");
+    } finally {
+      setMovieLoading(false);
+    }
+  }
+
+  async function handleMovieFileUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const isTextFile = file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt");
+    if (!isTextFile) {
+      setMovieError("For now, movie scanning can read .txt files. Paste text from PDFs or DOCX files into the box.");
+      return;
+    }
+
+    const text = await file.text();
+    setMovieText(text.trim());
+    if (!movieTitle.trim()) {
+      setMovieTitle(file.name.replace(/\.[^/.]+$/, ""));
+    }
+    setMovieResult(null);
+    setMovieError("");
+  }
+
+  return (
+    <section className="grid gap-6 xl:grid-cols-2">
+      <div className="bc-card overflow-hidden">
+        <div className="border-b border-bc-border bg-bc-surface-2 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-bc-md bg-bc-primary-soft text-bc-primary">
+              <ImageIcon size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-bc-text">Custom cover generator</h2>
+              <p className="text-[13px] text-bc-subtext">Turn your manuscript mood into a generated cover concept.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-5 p-5 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="space-y-3">
+            <ManuscriptSelect
+              value={selectedManuscriptId}
+              manuscripts={manuscripts}
+              onChange={applyManuscript}
+            />
+            <TextInput label="Title" value={coverTitle} onChange={setCoverTitle} placeholder="The Glass Orchard" />
+            <TextInput label="Genre" value={coverGenre} onChange={setCoverGenre} placeholder="Fantasy, thriller, romance..." />
+            <TextArea
+              label="Synopsis or excerpt"
+              value={coverDescription}
+              onChange={setCoverDescription}
+              placeholder="Paste the story premise, mood, or a strong excerpt..."
+              rows={6}
+            />
+            <TextArea
+              label="Visual direction"
+              value={coverDirection}
+              onChange={setCoverDirection}
+              placeholder="Optional: gothic, cinematic, hand-painted, bright colors..."
+              rows={3}
+            />
+            {coverError && <ToolError message={coverError} />}
+            <Button
+              fullWidth
+              disabled={coverLoading}
+              onClick={handleGenerateCover}
+              leftIcon={coverLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 size={14} />}
+            >
+              {coverLoading ? "Generating cover..." : "Generate custom cover"}
+            </Button>
+          </div>
+
+          <div className="rounded-bc-lg border border-bc-border bg-bc-surface-muted p-4">
+            {coverResult ? (
+              <div className="space-y-4">
+                <div className="mx-auto aspect-[2/3] max-h-[420px] overflow-hidden rounded-bc-md bg-bc-surface shadow-bc-lg">
+                  <img
+                    src={coverResult.imageUrl}
+                    alt="Generated book cover concept"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-bc-subtext">Tagline</div>
+                  <p className="mt-1 text-sm font-semibold text-bc-text">{coverResult.tagline}</p>
+                </div>
+                {coverResult.palette.length > 0 && (
+                  <div className="flex gap-2">
+                    {coverResult.palette.map((color) => (
+                      <span
+                        key={color}
+                        title={color}
+                        className="h-7 w-7 rounded-full border border-bc-border shadow-bc-xs"
+                        style={{ background: color }}
+                      />
+                    ))}
+                  </div>
+                )}
+                <details className="rounded-bc-md border border-bc-border bg-bc-surface p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-bc-text">Image prompt</summary>
+                  <p className="mt-2 text-xs leading-5 text-bc-subtext">{coverResult.prompt}</p>
+                </details>
+              </div>
+            ) : (
+              <div className="grid h-full min-h-[360px] place-items-center text-center">
+                <div>
+                  <ImageIcon className="mx-auto mb-3 h-10 w-10 text-bc-subtext" />
+                  <p className="text-sm font-semibold text-bc-text">Your cover preview appears here</p>
+                  <p className="mt-1 text-sm text-bc-subtext">Use a manuscript or paste a synopsis to start.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="bc-card overflow-hidden">
+        <div className="border-b border-bc-border bg-bc-surface-2 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-bc-md bg-bc-primary-soft text-bc-primary">
+              <Clapperboard size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-bc-text">Find your movie</h2>
+              <p className="text-[13px] text-bc-subtext">Scan a manuscript excerpt and get movie comparisons.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-5 p-5 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="space-y-3">
+            <ManuscriptSelect
+              value={selectedManuscriptId}
+              manuscripts={manuscripts}
+              onChange={applyManuscript}
+            />
+            <TextInput label="Title" value={movieTitle} onChange={setMovieTitle} placeholder="Manuscript title" />
+            <TextInput label="Genre" value={movieGenre} onChange={setMovieGenre} placeholder="Mystery, sci-fi, literary..." />
+            <TextArea
+              label="Text to scan"
+              value={movieText}
+              onChange={setMovieText}
+              placeholder="Paste a synopsis, chapter, or full text excerpt..."
+              rows={10}
+            />
+            <input
+              ref={movieFileRef}
+              type="file"
+              accept=".txt,text/plain"
+              onChange={handleMovieFileUpload}
+              className="hidden"
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                fullWidth
+                onClick={() => movieFileRef.current?.click()}
+                leftIcon={<Upload size={14} />}
+              >
+                Upload .txt
+              </Button>
+              <Button
+                type="button"
+                fullWidth
+                disabled={movieLoading}
+                onClick={handleFindMovies}
+                leftIcon={movieLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film size={14} />}
+              >
+                {movieLoading ? "Scanning..." : "Find movies"}
+              </Button>
+            </div>
+            {movieError && <ToolError message={movieError} />}
+          </div>
+
+          <div className="rounded-bc-lg border border-bc-border bg-bc-surface-muted p-4">
+            {movieResult ? (
+              <div>
+                <p className="mb-4 text-sm leading-6 text-bc-text-soft">{movieResult.summary}</p>
+                <div className="space-y-3">
+                  {movieResult.movies.map((movie) => (
+                    <article key={`${movie.title}-${movie.year}`} className="rounded-bc-md border border-bc-border bg-bc-surface p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-bold text-bc-text">
+                            {movie.title} {movie.year ? <span className="text-bc-subtext">({movie.year})</span> : null}
+                          </h3>
+                          <p className="mt-2 text-xs leading-5 text-bc-text-soft">{movie.reason}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-bc-primary-soft px-2.5 py-1 text-xs font-bold text-bc-primary">
+                          {movie.match_score}%
+                        </span>
+                      </div>
+                      {movie.shared_elements.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {movie.shared_elements.map((element) => (
+                            <span key={element} className="rounded-full border border-bc-border bg-bc-surface-muted px-2 py-1 text-[11px] text-bc-subtext">
+                              {element}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="grid h-full min-h-[360px] place-items-center text-center">
+                <div>
+                  <Clapperboard className="mx-auto mb-3 h-10 w-10 text-bc-subtext" />
+                  <p className="text-sm font-semibold text-bc-text">Movie matches appear here</p>
+                  <p className="mt-1 text-sm text-bc-subtext">The scan compares tone, themes, setting, and character dynamics.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ManuscriptSelect({
+  value,
+  manuscripts,
+  onChange,
+}: {
+  value: string;
+  manuscripts: any[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-[0.08em] text-bc-subtext">
+        Manuscript
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-bc-md border border-bc-border bg-bc-surface px-3 text-sm text-bc-text outline-none transition focus:border-bc-primary focus:ring-2 focus:ring-bc-primary/20"
+      >
+        <option value="">Choose a manuscript...</option>
+        {manuscripts.map((manuscript) => (
+          <option key={manuscript.id} value={manuscript.id}>
+            {manuscript.title}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function TextInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-[0.08em] text-bc-subtext">
+        {label}
+      </span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-10 w-full rounded-bc-md border border-bc-border bg-bc-surface px-3 text-sm text-bc-text outline-none transition placeholder:text-bc-subtext focus:border-bc-primary focus:ring-2 focus:ring-bc-primary/20"
+      />
+    </label>
+  );
+}
+
+function TextArea({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  rows: number;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-[0.08em] text-bc-subtext">
+        {label}
+      </span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full resize-none rounded-bc-md border border-bc-border bg-bc-surface px-3 py-2 text-sm leading-6 text-bc-text outline-none transition placeholder:text-bc-subtext focus:border-bc-primary focus:ring-2 focus:ring-bc-primary/20"
+      />
+    </label>
+  );
+}
+
+function ToolError({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-bc-md border border-bc-danger/30 bg-bc-danger/10 px-3 py-2 text-[13px] text-bc-danger">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 function createNewConversation(): ChatConversation {
   const now = new Date().toISOString();
 
@@ -376,7 +775,7 @@ function StudioAiChat({ userId }: { userId?: string }) {
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeConversation =
@@ -407,7 +806,15 @@ function StudioAiChat({ userId }: { userId?: string }) {
   }, [conversations, storageKey]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages, isLoading]);
 
   const selectedMode = AI_MODES[mode];
@@ -469,10 +876,10 @@ function StudioAiChat({ userId }: { userId?: string }) {
       return;
     }
 
-    const finalPrompt =
-      mode === "correct"
-        ? `Correct this text grammatically: ${sourceText}`
-        : `Continue this story naturally: ${sourceText}`;
+    const payload = {
+      text: sourceText,
+      mode,
+    };
     const visibleUserMessage = `${selectedMode.label}\n\n${sourceText}`;
 
     appendMessage({ role: "user", content: visibleUserMessage });
@@ -483,18 +890,15 @@ function StudioAiChat({ userId }: { userId?: string }) {
     setIsLoading(true);
 
     try {
-      console.log("Sending AI request to Django:", {
-        endpoint: AI_ENDPOINT,
-        mode,
-        text: finalPrompt,
-      });
+      console.log("Sending AI payload:", payload);
+      console.log("Sending AI request to Django:", AI_ENDPOINT);
 
       const response = await fetch(AI_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: finalPrompt }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -664,7 +1068,7 @@ function StudioAiChat({ userId }: { userId?: string }) {
       </div>
 
       <div className="flex h-[640px] flex-col">
-        <div className="flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
+        <div ref={messagesContainerRef} className="flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
           {messages.map((message, index) => (
             <ChatBubble key={`${message.role}-${index}`} message={message} />
           ))}
@@ -683,7 +1087,6 @@ function StudioAiChat({ userId }: { userId?: string }) {
             </div>
           )}
 
-          <div ref={bottomRef} />
         </div>
 
         <form onSubmit={handleSubmit} className="border-t border-bc-border bg-bc-surface p-4">

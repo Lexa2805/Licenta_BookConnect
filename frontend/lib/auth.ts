@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import clientPromise from "@/lib/mongodb";
 import bcrypt from "bcryptjs";
 import type { Collection, Document } from "mongodb";
+import { normalizeRole } from "@/lib/roles";
 
 async function createUniqueUsername(
     usersCollection: Collection<Document>,
@@ -79,7 +80,7 @@ const providers: NextAuthOptions["providers"] = [
                     id: user._id.toString(),
                     username: user.username,
                     email: user.email,
-                    role: user.role || "reader",
+                    role: normalizeRole(user.role),
                     rememberMe: credentials.rememberMe === "true",
                 };
             } catch (error: any) {
@@ -141,7 +142,7 @@ export const authOptions: NextAuthOptions = {
 
                     user.id = existingUser._id.toString();
                     user.username = existingUser.username;
-                    user.role = existingUser.role || "reader";
+                    user.role = normalizeRole(existingUser.role);
                     user.rememberMe = true;
                     return true;
                 }
@@ -187,7 +188,7 @@ export const authOptions: NextAuthOptions = {
                 token.id = user.id;
                 token.username = user.username || token.name || "reader";
                 token.email = user.email || token.email;
-                token.role = user.role || "reader";
+                token.role = normalizeRole(user.role);
                 token.rememberMe = Boolean(user.rememberMe);
             }
             return token;
@@ -197,7 +198,7 @@ export const authOptions: NextAuthOptions = {
                 session.user.id = token.id as string;
                 session.user.username = token.username as string;
                 session.user.email = token.email as string;
-                session.user.role = token.role as string;
+                session.user.role = normalizeRole(token.role);
             }
             return session;
         },

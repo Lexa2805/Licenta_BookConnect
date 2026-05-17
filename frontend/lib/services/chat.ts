@@ -51,6 +51,37 @@ export interface DirectMessagePayload {
     attachment_size?: number;
 }
 
+export interface ChatMessagePayload {
+    group?: string | number;
+    group_id?: string | number;
+    sender_id: string;
+    sender_name?: string;
+    content?: string;
+    attachment?: File | null;
+    attachment_name?: string;
+    attachment_type?: string;
+    attachment_size?: number;
+}
+
+function buildMessageFormData(data: DirectMessagePayload | ChatMessagePayload): FormData {
+    const payload = new FormData();
+
+    Object.entries(data).forEach(([key, value]) => {
+        if (value === undefined || value === null) {
+            return;
+        }
+
+        if (key === "attachment" && value instanceof File) {
+            payload.append(key, value);
+            return;
+        }
+
+        payload.append(key, String(value));
+    });
+
+    return payload;
+}
+
 export const chatService = {
     // Group Management
     getGroups: async (): Promise<ChatGroup[]> => {
@@ -98,8 +129,9 @@ export const chatService = {
         const response = await api.get("/api/chat/messages/", { params });
         return response.data;
     },
-    sendMessage: async (data: any) => {
-        const response = await api.post("/api/chat/messages/", data);
+    sendMessage: async (data: ChatMessagePayload) => {
+        const payload = data.attachment ? buildMessageFormData(data) : data;
+        const response = await api.post("/api/chat/messages/", payload);
         return response.data;
     },
 
@@ -115,19 +147,7 @@ export const chatService = {
     },
 
     sendDirectMessage: async (data: DirectMessagePayload): Promise<DirectMessage> => {
-        const payload = new FormData();
-        payload.append("sender_id", data.sender_id);
-        if (data.sender_name) payload.append("sender_name", data.sender_name);
-        payload.append("receiver_id", data.receiver_id);
-        if (data.receiver_name) payload.append("receiver_name", data.receiver_name);
-        if (data.content !== undefined) payload.append("content", data.content);
-        if (data.attachment) payload.append("attachment", data.attachment);
-        if (data.attachment_name) payload.append("attachment_name", data.attachment_name);
-        if (data.attachment_type) payload.append("attachment_type", data.attachment_type);
-        if (data.attachment_size !== undefined) {
-            payload.append("attachment_size", String(data.attachment_size));
-        }
-
+        const payload = buildMessageFormData(data);
         const response = await api.post("/api/chat/messages/", payload);
         return response.data;
     },

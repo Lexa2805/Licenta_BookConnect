@@ -14,6 +14,26 @@ export interface VibeCardResult {
   caption: string;
 }
 
+export interface CustomCoverResult {
+  imageUrl: string;
+  prompt: string;
+  tagline: string;
+  palette: string[];
+}
+
+export interface MovieMatch {
+  title: string;
+  year?: string;
+  match_score: number;
+  reason: string;
+  shared_elements: string[];
+}
+
+export interface MovieMatchResult {
+  summary: string;
+  movies: MovieMatch[];
+}
+
 interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -307,6 +327,124 @@ Create a unique, ${randomStyle}-inspired artwork in ${colorMood} palette for thi
     imageUrl,
     prompt: parsed.prompt,
     caption: parsed.caption,
+  };
+}
+
+export async function generateCustomCover(
+  title: string,
+  genre: string,
+  description: string,
+  visualDirection: string = "",
+): Promise<CustomCoverResult> {
+  const uniqueSeed = generateUniqueSeed();
+  const systemPrompt = `You are a senior book cover art director for independent writers.
+Create a professional custom book cover concept from the writer's title, genre, and synopsis.
+
+Rules:
+- The image prompt must describe cover art only. Do not ask the image model to render readable text, typography, author names, or title lettering.
+- Make the concept specific to the story instead of generic stock imagery.
+- Use a clear focal subject, background, color palette, lighting, and style.
+- Avoid copyrighted characters, logos, celebrity likenesses, and existing franchise styles.
+- Return only JSON in this exact shape:
+{
+  "prompt": "AI image prompt under 140 words",
+  "tagline": "Short marketing tagline under 14 words",
+  "palette": ["#123456", "#abcdef", "#789abc"]
+}`;
+
+  const userPrompt = `Title: ${title || "Untitled manuscript"}
+Genre: ${genre || "Unknown"}
+Synopsis or excerpt:
+${description.slice(0, 7000)}
+
+Writer visual direction:
+${visualDirection || "No extra direction provided."}
+
+Create a distinctive cover concept. Unique generation seed: ${uniqueSeed}.`;
+
+  const raw = await callOpenRouter(
+    [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    0.92,
+  );
+
+  const parsed = parseJsonFromLLM<{
+    prompt: string;
+    tagline: string;
+    palette: string[];
+  }>(raw);
+  const safePrompt = parsed.prompt
+    .replace(/[\r\n]+/g, " ")
+    .replace(/[^a-zA-Z0-9\s.,:;'"()-]/g, "")
+    .slice(0, 520);
+  const prompt = `${safePrompt}, premium book cover illustration, no text, no typography, no logo, centered composition, print-ready, cinematic lighting, high detail`;
+
+  return {
+    imageUrl: getPollinationsImageUrl(prompt, 768, 1152, uniqueSeed),
+    prompt: parsed.prompt,
+    tagline: parsed.tagline,
+    palette: Array.isArray(parsed.palette) ? parsed.palette.slice(0, 5) : [],
+  };
+}
+
+export async function findMovieMatches(
+  title: string,
+  bookText: string,
+  genre: string = "",
+): Promise<MovieMatchResult> {
+  const systemPrompt = `You are a film comparison assistant for writers.
+Given a manuscript excerpt, synopsis, or full pasted text, recommend real movies that share tone, themes, structure, character dynamics, or setting.
+
+Important:
+- Do not claim the manuscript is copied from a movie.
+- Do not invent movies. Recommend real, known films only.
+- Prefer useful creative comparisons over shallow genre matches.
+- If the text is too short, say the matches are tentative.
+- Return only JSON in this exact shape:
+{
+  "summary": "Brief comparison summary",
+  "movies": [
+    {
+      "title": "Movie title",
+      "year": "YYYY",
+      "match_score": 0-100,
+      "reason": "Why this movie matches",
+      "shared_elements": ["element", "element", "element"]
+    }
+  ]
+}`;
+
+  const userPrompt = `Book/manuscript title: ${title || "Untitled"}
+Genre: ${genre || "Unknown"}
+Text to scan:
+${bookText.slice(0, 10000)}
+
+Find 5 movie matches for this work.`;
+
+  const raw = await callOpenRouter(
+    [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    0.45,
+  );
+
+  const parsed = parseJsonFromLLM<MovieMatchResult>(raw);
+  const movies = Array.isArray(parsed.movies) ? parsed.movies : [];
+
+  return {
+    summary: parsed.summary || "Movie matches generated from the supplied text.",
+    movies: movies.slice(0, 5).map((movie) => ({
+      title: movie.title,
+      year: movie.year,
+      match_score: Math.max(0, Math.min(100, Number(movie.match_score) || 0)),
+      reason: movie.reason,
+      shared_elements: Array.isArray(movie.shared_elements)
+        ? movie.shared_elements.slice(0, 4)
+        : [],
+    })),
   };
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
+import { normalizeRole } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
     try {
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
             id: u._id.toString(),
             username: u.username,
             email: u.email,
-            role: u.role || "reader",
+            role: normalizeRole(u.role),
             created_at: u.created_at || null,
         }));
 

@@ -6,14 +6,17 @@ import { NAV_ITEMS, type NavKey } from "@/lib/nav";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import { libraryService } from "@/lib/services/library";
+import { canReadLibrary, hasCapability } from "@/lib/roles";
 
 export function Sidebar({ active }: { active: NavKey }) {
   const { data: session } = useSession();
+  const userRole = session?.user?.role;
+  const showReadingWidgets = canReadLibrary(userRole);
 
   const { data: streak } = useQuery({
     queryKey: ["reading-streak", session?.user?.id],
     queryFn: () => libraryService.getReadingStreak(session!.user.id as string),
-    enabled: !!session?.user?.id,
+    enabled: !!session?.user?.id && showReadingWidgets,
     staleTime: 60_000,
   });
 
@@ -43,7 +46,7 @@ export function Sidebar({ active }: { active: NavKey }) {
 
       {/* Nav */}
       <nav className="flex flex-col gap-1 flex-1">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => hasCapability(userRole, item.requiredCapability)).map((item) => {
           const isActive = item.key === active;
           return (
             <Link
@@ -64,21 +67,23 @@ export function Sidebar({ active }: { active: NavKey }) {
       </nav>
 
       {/* Streak */}
-      <div className="mt-auto bc-card p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Flame size={14} className="text-bc-warning" />
-          <span className="text-[13px] font-semibold text-bc-text">
-            Reading streak
-          </span>
+      {showReadingWidgets && (
+        <div className="mt-auto bc-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Flame size={14} className="text-bc-warning" />
+            <span className="text-[13px] font-semibold text-bc-text">
+              Reading streak
+            </span>
+          </div>
+          <div className="text-[11.5px] text-bc-subtext mb-3">{streakLabel}</div>
+          <div className="h-1.5 bg-bc-surface-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-bc-primary-grad rounded-full"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
         </div>
-        <div className="text-[11.5px] text-bc-subtext mb-3">{streakLabel}</div>
-        <div className="h-1.5 bg-bc-surface-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-bc-primary-grad rounded-full"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-      </div>
+      )}
     </aside>
   );
 }
