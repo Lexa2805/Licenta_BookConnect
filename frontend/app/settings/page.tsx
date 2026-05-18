@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { userService } from "@/lib/services/users";
-import { normalizeRole } from "@/lib/roles";
+import { getRoleLabel, normalizeRole, SELECTABLE_ACCOUNT_ROLES, type SelectableAccountRole } from "@/lib/roles";
 
 const AVATAR_STYLES = [
   {
@@ -95,6 +95,7 @@ export default function SettingsPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [about, setAbout] = useState("");
+  const [role, setRole] = useState<SelectableAccountRole>("reader");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState("");
@@ -111,6 +112,8 @@ export default function SettingsPage() {
     setUsername(profile.username || "");
     setEmail(profile.email || "");
     setAbout(profile.profile?.about || "");
+    const nextRole = normalizeRole(profile.role);
+    setRole(nextRole === "admin" ? "reader" : nextRole);
     setAvatarUrl(profile.profile?.avatar_url || "");
   }, [profile]);
 
@@ -143,6 +146,7 @@ export default function SettingsPage() {
       data.append("username", username);
       data.append("email", email);
       data.append("about", about);
+      data.append("role", role);
       data.append("avatar_url", avatarUrl);
       if (avatarFile) data.append("avatar", avatarFile);
       return userService.updateMe(data);
@@ -265,6 +269,38 @@ export default function SettingsPage() {
             </label>
           </div>
 
+          <fieldset>
+            <legend className="mb-2 block text-[13px] font-semibold text-bc-text">Account type</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {SELECTABLE_ACCOUNT_ROLES.map((option) => {
+                const selected = role === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setRole(option)}
+                    className={[
+                      "rounded-bc-md border px-3 py-3 text-left text-sm transition",
+                      selected
+                        ? "border-bc-primary bg-bc-primary-soft text-bc-primary shadow-bc-xs"
+                        : "border-bc-border bg-bc-surface text-bc-text-soft hover:border-bc-primary hover:text-bc-text",
+                    ].join(" ")}
+                    aria-pressed={selected}
+                  >
+                    <span className="block font-bold">{getRoleLabel(option)}</span>
+                    <span className="mt-1 block text-xs text-bc-subtext">
+                      {option === "reader"
+                        ? "Read books and public works."
+                        : option === "writer"
+                          ? "Write and manage manuscripts."
+                          : "Read, write, and sell books."}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
           <label className="block">
             <span className="mb-1.5 block text-[13px] font-semibold text-bc-text">About me</span>
             <textarea
@@ -323,6 +359,7 @@ export default function SettingsPage() {
                     {username || "Your username"}
                   </div>
                   <div className="truncate text-xs text-bc-subtext">{email || "email@example.com"}</div>
+                  <div className="mt-1 text-xs font-semibold text-bc-primary">{getRoleLabel(role)}</div>
                 </div>
               </div>
               <p className="mt-4 text-sm leading-6 text-bc-text-soft">

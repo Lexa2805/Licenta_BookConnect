@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } fr
 import {
   AlertCircle,
   Bot,
+  Check,
   FileText,
   Globe2,
   ImageIcon,
@@ -25,6 +26,7 @@ import { Button } from "@/components/ui/Button";
 import { SectionHeader } from "@/components/ui/SectionTitle";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
+import { pdfjs } from "react-pdf";
 import { manuscriptsService } from "@/lib/services/manuscripts";
 import { marketplaceService } from "@/lib/services/marketplace";
 import {
@@ -34,6 +36,8 @@ import {
 import { useRouter } from "next/navigation";
 
 const AI_ENDPOINT = "http://127.0.0.1:8000/ai/generate/";
+
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 type AiMode = "correct" | "continue";
 
@@ -49,6 +53,48 @@ type ChatConversation = {
   createdAt: string;
   updatedAt: string;
 };
+
+async function extractTextFromUpload(file: File) {
+  const fileName = file.name.toLowerCase();
+
+  if (file.type === "text/plain" || fileName.endsWith(".txt") || fileName.endsWith(".md")) {
+    return file.text();
+  }
+
+  if (fileName.endsWith(".rtf")) {
+    const raw = await file.text();
+    return raw
+      .replace(/\\par[d]?/g, "\n")
+      .replace(/\\'[0-9a-fA-F]{2}/g, " ")
+      .replace(/[{}]/g, "")
+      .replace(/\\[a-zA-Z]+-?\d* ?/g, "")
+      .replace(/\s+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  if (file.type === "application/pdf" || fileName.endsWith(".pdf")) {
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
+    const pages: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      const text = textContent.items
+        .map((item) => ("str" in item ? item.str : ""))
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (text) pages.push(text);
+    }
+
+    return pages.join("\n\n");
+  }
+
+  return "";
+}
 
 const AI_MODES: Record<AiMode, { label: string; Icon: typeof Wand2 }> = {
   correct: {
@@ -133,11 +179,8 @@ export default function StudioPage() {
       data.append("status", "DRAFT");
       data.append("file", file);
 
-      if (file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt")) {
-        data.append("content", await file.text());
-      } else {
-        data.append("content", "");
-      }
+      const extractedText = (await extractTextFromUpload(file)).trim();
+      data.append("content", extractedText);
 
       const manuscript = await manuscriptsService.createManuscript(data);
       await refetchManuscripts();
@@ -197,7 +240,7 @@ export default function StudioPage() {
     >
       <StudioAiChat userId={userId} />
 
-      <WriterCreativeTools manuscripts={manuscripts} />
+      <WriterCreativeTools manuscripts={manuscripts} userId={userId} onSaved={refetchManuscripts} />
 
       <section className="grid md:grid-cols-2 gap-6">
         <div>
@@ -210,7 +253,19 @@ export default function StudioPage() {
             ) : (
               manuscripts.slice(0, 6).map((m: any, i: number) => (
                 <div key={m.id ?? i} className="flex items-center justify-between gap-4 py-4 px-5 hover:bg-bc-surface-muted transition-colors">
-                  <div className="min-w-0 cursor-pointer" onClick={() => router.push(`/studio/editor/${m.id}`)}>
+                  <div className="flex min-w-0 cursor-pointer items-center gap-3" onClick={() => router.push(`/studio/editor/${m.id}`)}>
+                    {m.cover_url ? (
+                      <img
+                        src={m.cover_url}
+                        alt=""
+                        className="h-14 w-10 shrink-0 rounded-bc-sm border border-bc-border object-cover shadow-bc-xs"
+                      />
+                    ) : (
+                      <div className="grid h-14 w-10 shrink-0 place-items-center rounded-bc-sm border border-bc-border bg-bc-primary-soft text-bc-primary">
+                        <FileText size={16} />
+                      </div>
+                    )}
+                    <div className="min-w-0">
                     <div className="truncate text-[14px] font-semibold text-bc-text">{m.title}</div>
                     <div className="text-[12.5px] text-bc-subtext flex items-center gap-2">
                       <span className={`inline-block w-2 h-2 rounded-full ${m.status === "PUBLISHED" ? "bg-bc-success" : "bg-bc-warning"}`}></span>
@@ -226,6 +281,7 @@ export default function StudioPage() {
                           File
                         </a>
                       )}
+                    </div>
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
@@ -280,7 +336,15 @@ export default function StudioPage() {
   );
 }
 
-function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
+function WriterCreativeTools({
+  manuscripts,
+  userId,
+  onSaved,
+}: {
+  manuscripts: any[];
+  userId?: string;
+  onSaved: () => Promise<unknown>;
+}) {
   const [selectedManuscriptId, setSelectedManuscriptId] = useState("");
   const [coverTitle, setCoverTitle] = useState("");
   const [coverGenre, setCoverGenre] = useState("");
@@ -288,7 +352,9 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
   const [coverDirection, setCoverDirection] = useState("");
   const [coverResult, setCoverResult] = useState<CustomCoverResult | null>(null);
   const [coverLoading, setCoverLoading] = useState(false);
+  const [coverSaving, setCoverSaving] = useState(false);
   const [coverError, setCoverError] = useState("");
+  const [coverMessage, setCoverMessage] = useState("");
 
   function applyManuscript(manuscriptId: string) {
     setSelectedManuscriptId(manuscriptId);
@@ -301,6 +367,7 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
     setCoverDescription(content.slice(0, 4000));
     setCoverResult(null);
     setCoverError("");
+    setCoverMessage("");
   }
 
   async function handleGenerateCover() {
@@ -312,6 +379,7 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
 
     setCoverLoading(true);
     setCoverError("");
+    setCoverMessage("");
     try {
       const result = await generateCustomCover(
         coverTitle.trim(),
@@ -324,6 +392,46 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
       setCoverError(err instanceof Error ? err.message : "Could not generate a cover.");
     } finally {
       setCoverLoading(false);
+    }
+  }
+
+  async function handleSaveCover() {
+    if (!userId) {
+      setCoverError("Please sign in before saving a cover.");
+      return;
+    }
+
+    if (!selectedManuscriptId) {
+      setCoverError("Choose the manuscript where this cover should be saved.");
+      return;
+    }
+
+    if (!coverResult) {
+      setCoverError("Generate a cover before saving it.");
+      return;
+    }
+
+    setCoverSaving(true);
+    setCoverError("");
+    setCoverMessage("");
+
+    try {
+      await manuscriptsService.updateManuscript(
+        selectedManuscriptId,
+        {
+          cover_url: coverResult.fallbackImageUrl || coverResult.imageUrl,
+          cover_prompt: coverResult.prompt,
+          cover_tagline: coverResult.tagline,
+          cover_palette: coverResult.palette,
+        },
+        userId,
+      );
+      await onSaved();
+      setCoverMessage("Cover saved to manuscript.");
+    } catch (err) {
+      setCoverError(err instanceof Error ? err.message : "Could not save this cover.");
+    } finally {
+      setCoverSaving(false);
     }
   }
 
@@ -366,6 +474,12 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
               rows={3}
             />
             {coverError && <ToolError message={coverError} />}
+            {coverMessage && (
+              <div className="flex items-center gap-2 rounded-bc-md border border-bc-success/30 bg-bc-success/10 px-3 py-2 text-[13px] font-semibold text-bc-success">
+                <Check className="h-4 w-4" />
+                {coverMessage}
+              </div>
+            )}
             <Button
               fullWidth
               disabled={coverLoading}
@@ -373,6 +487,15 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
               leftIcon={coverLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 size={14} />}
             >
               {coverLoading ? "Generating cover..." : "Generate custom cover"}
+            </Button>
+            <Button
+              fullWidth
+              variant="secondary"
+              disabled={!coverResult || !selectedManuscriptId || coverSaving}
+              onClick={handleSaveCover}
+              leftIcon={coverSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check size={14} />}
+            >
+              {coverSaving ? "Saving cover..." : "Save as manuscript cover"}
             </Button>
           </div>
 
@@ -383,6 +506,11 @@ function WriterCreativeTools({ manuscripts }: { manuscripts: any[] }) {
                   <img
                     src={coverResult.imageUrl}
                     alt="Generated book cover concept"
+                    onError={(event) => {
+                      if (coverResult.fallbackImageUrl && event.currentTarget.src !== coverResult.fallbackImageUrl) {
+                        event.currentTarget.src = coverResult.fallbackImageUrl;
+                      }
+                    }}
                     className="h-full w-full object-cover"
                   />
                 </div>
@@ -719,26 +847,13 @@ function StudioAiChat({ userId }: { userId?: string }) {
 
     setError("");
 
-    const fileName = file.name;
-    const extension = fileName.split(".").pop()?.toLowerCase();
-    const isTextFile = extension === "txt" || file.type === "text/plain";
-
-    if (!isTextFile) {
-      setUploadedFileName(fileName);
-      setUploadedText("");
-      setError(
-        "This browser upload currently extracts plain .txt files. For PDF or DOCX, paste the text into the editor.",
-      );
-      event.target.value = "";
-      return;
-    }
-
     try {
-      const text = await file.text();
+      const fileName = file.name;
+      const text = await extractTextFromUpload(file);
       const cleanedText = text.trim();
 
       if (!cleanedText) {
-        throw new Error("The uploaded file did not contain readable text.");
+        throw new Error("The uploaded file did not contain readable text. For DOC/DOCX files, paste the text into the editor.");
       }
 
       setUploadedText(cleanedText);
@@ -921,7 +1036,7 @@ function StudioAiChat({ userId }: { userId?: string }) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".txt,text/plain,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".txt,.md,.rtf,text/plain,.pdf,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleFileUpload}
             className="hidden"
           />

@@ -150,10 +150,12 @@ def save_uploaded_file(uploaded_file, folder, request=None):
         raise RuntimeError("Cloudinary is not configured for image uploads.")
 
     if content_type == "application/pdf" or str(uploaded_file.name).lower().endswith(".pdf"):
-        cloudinary_info = _upload_to_cloudinary(uploaded_file, folder, "raw")
+        try:
+            cloudinary_info = _upload_to_cloudinary(uploaded_file, folder, "raw")
+        except Exception:
+            cloudinary_info = None
         if cloudinary_info:
             return cloudinary_info
-        raise RuntimeError("Cloudinary is not configured for PDF uploads.")
 
     filename = get_valid_filename(uploaded_file.name)
     storage_path = default_storage.save(posixpath.join(folder, filename), uploaded_file)

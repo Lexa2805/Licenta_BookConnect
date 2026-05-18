@@ -6,10 +6,30 @@ from pymongo import ReturnDocument
 
 COLLECTION = "manuscripts"
 FEEDBACK_COLLECTION = "manuscript_feedback"
+USERS_COLLECTION = "users"
 
 
 def _now():
     return datetime.now(timezone.utc)
+
+
+def _user_display_name(author_id):
+    object_id = to_object_id(author_id)
+    if object_id is None:
+        return ""
+
+    user = get_collection(USERS_COLLECTION).find_one(
+        {"_id": object_id},
+        {"username": 1, "name": 1, "email": 1},
+    )
+    if not user:
+        return ""
+
+    return (
+        (user.get("username") or "").strip()
+        or (user.get("name") or "").strip()
+        or (user.get("email") or "").split("@")[0].strip()
+    )
 
 
 def _serialize_manuscript(document, feedback=None):
@@ -17,6 +37,8 @@ def _serialize_manuscript(document, feedback=None):
     if data is None:
         return None
     data.setdefault("author_name", "")
+    if not data.get("author_name"):
+        data["author_name"] = _user_display_name(data.get("author_id"))
     data.setdefault("file_url", None)
     data.setdefault("file_path", None)
     data.setdefault("file", data.get("file_path"))
@@ -24,6 +46,10 @@ def _serialize_manuscript(document, feedback=None):
     data.setdefault("file_type", "")
     data.setdefault("file_size", 0)
     data.setdefault("file_public_id", None)
+    data.setdefault("cover_url", "")
+    data.setdefault("cover_prompt", "")
+    data.setdefault("cover_tagline", "")
+    data.setdefault("cover_palette", [])
     data["feedback"] = feedback if feedback is not None else []
     return data
 
@@ -63,11 +89,13 @@ def get_manuscript(manuscript_id, author_id=None, require_published=False):
 
 def create_manuscript(data, file_info=None):
     now = _now()
+    author_id = data.get("author_id") or "anonymous_author"
+    author_name = data.get("author_name") or data.get("author") or _user_display_name(author_id)
     document = {
         "title": data.get("title") or "Untitled manuscript",
         "content": data.get("content") or "",
-        "author_id": data.get("author_id") or "anonymous_author",
-        "author_name": data.get("author_name") or data.get("author") or "",
+        "author_id": author_id,
+        "author_name": author_name,
         "status": (data.get("status") or "DRAFT").upper(),
         "file_url": file_info["url"] if file_info else None,
         "file_path": file_info["path"] if file_info else None,
@@ -75,6 +103,10 @@ def create_manuscript(data, file_info=None):
         "file_type": file_info["content_type"] if file_info else "",
         "file_size": file_info["size"] if file_info else 0,
         "file_public_id": None,
+        "cover_url": data.get("cover_url") or "",
+        "cover_prompt": data.get("cover_prompt") or "",
+        "cover_tagline": data.get("cover_tagline") or "",
+        "cover_palette": data.get("cover_palette") or [],
         "created_at": now,
         "updated_at": now,
     }
@@ -89,9 +121,12 @@ def update_manuscript(manuscript_id, data, author_id=None, file_info=None):
         return None
 
     updates = {}
-    for field in ("title", "content", "author_name"):
+    for field in ("title", "content", "author_name", "cover_url", "cover_prompt", "cover_tagline"):
         if field in data:
             updates[field] = data.get(field) or ""
+    if "cover_palette" in data:
+        palette = data.get("cover_palette") or []
+        updates["cover_palette"] = palette if isinstance(palette, list) else []
     if "status" in data:
         updates["status"] = (data.get("status") or "DRAFT").upper()
     if file_info:

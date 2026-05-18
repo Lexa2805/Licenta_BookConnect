@@ -16,9 +16,14 @@ export interface Manuscript {
     title: string;
     content: string;
     author_id: string;
+    author_name?: string;
     status: "DRAFT" | "PUBLISHED" | "ARCHIVED" | string;
     file?: string | null;
     file_url?: string | null;
+    cover_url?: string;
+    cover_prompt?: string;
+    cover_tagline?: string;
+    cover_palette?: string[];
     feedback?: ManuscriptFeedback[];
     created_at: string;
     updated_at: string;

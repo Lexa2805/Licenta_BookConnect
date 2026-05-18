@@ -98,7 +98,7 @@ export default function PublicManuscriptReaderPage() {
     <PageLayout
       active="manuscripts"
       pageTitle={manuscript.title}
-      pageSubtitle={`Public manuscript updated ${formatDate(manuscript.updated_at)}.`}
+      pageSubtitle={`By ${manuscript.author_name || "Unknown author"} - updated ${formatDate(manuscript.updated_at)}.`}
       headerActions={
         <Link href="/manuscripts">
           <Button variant="secondary" leftIcon={<ArrowLeft size={14} />}>
@@ -109,8 +109,31 @@ export default function PublicManuscriptReaderPage() {
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <article className="rounded-bc-lg border border-bc-border bg-bc-surface shadow-bc-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-bc-border px-5 py-4">
-            <Badge variant="soft">Reader</Badge>
+          {manuscript.cover_url && (
+            <div className="flex flex-wrap items-center gap-5 border-b border-bc-border bg-bc-surface-muted px-5 py-5">
+              <img
+                src={manuscript.cover_url}
+                alt={`${manuscript.title} cover`}
+                className="h-44 w-28 rounded-bc-md border border-bc-border object-cover shadow-bc-md"
+              />
+              <div className="min-w-0">
+                <Badge variant="soft">Cover</Badge>
+                <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-bc-text">
+                  {manuscript.cover_tagline || manuscript.title}
+                </p>
+              </div>
+            </div>
+          )}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-bc-border px-5 py-4">
+            <div>
+              <Badge variant="soft">Reader</Badge>
+              <p className="mt-2 text-sm font-semibold text-bc-text">
+                {manuscript.title}
+              </p>
+              <p className="text-xs text-bc-subtext">
+                by {manuscript.author_name || "Unknown author"}
+              </p>
+            </div>
             <Button
               type="button"
               variant="ghost"

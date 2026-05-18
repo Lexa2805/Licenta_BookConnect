@@ -16,6 +16,7 @@ export interface VibeCardResult {
 
 export interface CustomCoverResult {
   imageUrl: string;
+  fallbackImageUrl?: string;
   prompt: string;
   tagline: string;
   palette: string[];
@@ -344,6 +345,12 @@ export async function generateCustomCover(
   visualDirection: string = "",
 ): Promise<CustomCoverResult> {
   const uniqueSeed = generateUniqueSeed();
+  const fallback = createFallbackCoverResult(title, genre, description, visualDirection, uniqueSeed);
+
+  if (!OPENROUTER_API_KEY) {
+    return fallback;
+  }
+
   const systemPrompt = `You are a senior book cover art director for independent writers.
 Create a professional custom book cover concept from the writer's title, genre, and synopsis.
 
@@ -369,31 +376,214 @@ ${visualDirection || "No extra direction provided."}
 
 Create a distinctive cover concept. Unique generation seed: ${uniqueSeed}.`;
 
-  const raw = await callOpenRouter(
-    [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    0.92,
-  );
-
-  const parsed = parseJsonFromLLM<{
+  let parsed: {
     prompt: string;
     tagline: string;
     palette: string[];
-  }>(raw);
+  };
+
+  try {
+    const raw = await callOpenRouter(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      0.92,
+    );
+
+    parsed = parseJsonFromLLM<{
+      prompt: string;
+      tagline: string;
+      palette: string[];
+    }>(raw);
+  } catch {
+    return fallback;
+  }
   const safePrompt = parsed.prompt
     .replace(/[\r\n]+/g, " ")
     .replace(/[^a-zA-Z0-9\s.,:;'"()-]/g, "")
     .slice(0, 520);
   const prompt = `${safePrompt}, premium book cover illustration, no text, no typography, no logo, centered composition, print-ready, cinematic lighting, high detail`;
 
+  const palette = Array.isArray(parsed.palette) ? parsed.palette.slice(0, 5) : [];
+
   return {
     imageUrl: getPollinationsImageUrl(prompt, 768, 1152, uniqueSeed),
+    fallbackImageUrl: createCoverDataUrl(title, parsed.tagline, palette, parsed.prompt, uniqueSeed),
     prompt: parsed.prompt,
     tagline: parsed.tagline,
-    palette: Array.isArray(parsed.palette) ? parsed.palette.slice(0, 5) : [],
+    palette,
   };
+}
+
+function createFallbackCoverResult(
+  title: string,
+  genre: string,
+  description: string,
+  visualDirection: string,
+  seed: number,
+): CustomCoverResult {
+  const source = `${title} ${genre} ${description} ${visualDirection}`.toLowerCase();
+  const palette = source.match(/romance|love|heart/)
+    ? ["#8f2f56", "#f0a6b4", "#f7d6a7", "#263238"]
+    : source.match(/fantasy|magic|kingdom|dragon/)
+      ? ["#263a73", "#7b5cc9", "#d7b56d", "#14213d"]
+      : source.match(/thriller|crime|murder|mystery|dark/)
+        ? ["#111827", "#7f1d1d", "#d6a84f", "#6b7280"]
+        : source.match(/sci|space|future|alien/)
+          ? ["#0f172a", "#0ea5e9", "#a3e635", "#e2e8f0"]
+          : ["#1f4a3a", "#c46a2b", "#f2c078", "#234f68"];
+  const subject = description
+    .replace(/[\r\n]+/g, " ")
+    .replace(/[^a-zA-Z0-9\s.,:;'"()-]/g, "")
+    .split(/\s+/)
+    .slice(0, 42)
+    .join(" ");
+  const prompt = [
+    genre ? `${genre} book cover illustration` : "literary book cover illustration",
+    title ? `inspired by a manuscript titled ${title}` : "for an untitled manuscript",
+    subject ? `story mood and symbols: ${subject}` : "evocative symbolic composition",
+    visualDirection || "cinematic lighting, clear focal subject, layered background",
+    `palette ${palette.join(", ")}`,
+    "no text, no typography, no logo, print-ready, high detail",
+  ].join(", ");
+
+  const tagline = title ? `A cover concept for ${title}` : "A cover concept for your manuscript";
+  const imageUrl = createCoverDataUrl(title, tagline, palette, prompt, seed);
+
+  return {
+    imageUrl,
+    fallbackImageUrl: imageUrl,
+    prompt,
+    tagline,
+    palette,
+  };
+}
+
+function createCoverDataUrl(
+  title: string,
+  tagline: string,
+  palette: string[],
+  prompt: string,
+  seed: number,
+) {
+  const colors = normalizePalette(palette);
+  const titleLines = wrapSvgText(title || "Untitled Manuscript", 18, 3);
+  const taglineLines = wrapSvgText(tagline || "A generated cover concept", 28, 2);
+  const promptWords = prompt
+    .replace(/[^a-zA-Z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 4)
+    .slice(0, 8);
+  const hash = Math.abs(seed || hashString(`${title}${tagline}${prompt}`));
+  const offsetA = 80 + (hash % 120);
+  const offsetB = 360 + (hash % 180);
+
+  const titleMarkup = titleLines
+    .map((line, index) => `<tspan x="70" y="${152 + index * 42}">${escapeXml(line)}</tspan>`)
+    .join("");
+  const taglineMarkup = taglineLines
+    .map((line, index) => `<tspan x="70" y="${690 + index * 24}">${escapeXml(line)}</tspan>`)
+    .join("");
+  const keywordMarkup = promptWords
+    .map((word, index) => {
+      const x = 74 + (index % 2) * 190;
+      const y = 470 + Math.floor(index / 2) * 42;
+      return `<text x="${x}" y="${y}" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#ffffff" opacity="0.78">${escapeXml(word.toUpperCase())}</text>`;
+    })
+    .join("");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1152" viewBox="0 0 768 1152">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="${colors[0]}"/>
+    <stop offset="0.55" stop-color="${colors[1]}"/>
+    <stop offset="1" stop-color="${colors[2]}"/>
+  </linearGradient>
+  <radialGradient id="glow" cx="50%" cy="35%" r="65%">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0.75"/>
+    <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.16"/>
+    <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#000000" flood-opacity="0.28"/>
+  </filter>
+</defs>
+<rect width="768" height="1152" fill="url(#bg)"/>
+<rect width="768" height="1152" fill="url(#glow)"/>
+<path d="M0 ${offsetA} C170 ${offsetA + 70} 230 ${offsetA - 80} 410 ${offsetA + 12} S650 ${offsetA + 105} 768 ${offsetA + 22} V0 H0Z" fill="#ffffff" opacity="0.18"/>
+<path d="M0 ${offsetB} C190 ${offsetB - 80} 300 ${offsetB + 90} 520 ${offsetB} S690 ${offsetB - 70} 768 ${offsetB + 20}" fill="none" stroke="#ffffff" stroke-width="4" opacity="0.34"/>
+<g opacity="0.24">
+  <path d="M96 320 H672 M96 384 H672 M96 448 H672 M96 512 H672 M96 576 H672 M96 640 H672" stroke="#ffffff" stroke-width="1"/>
+  <path d="M160 266 V696 M256 266 V696 M352 266 V696 M448 266 V696 M544 266 V696 M640 266 V696" stroke="#ffffff" stroke-width="1"/>
+</g>
+<g filter="url(#shadow)">
+  <rect x="88" y="286" width="592" height="360" rx="38" fill="#ffffff" opacity="0.16"/>
+  <circle cx="384" cy="466" r="122" fill="${colors[3]}" opacity="0.46"/>
+  <circle cx="384" cy="466" r="84" fill="#ffffff" opacity="0.8"/>
+  <circle cx="384" cy="466" r="46" fill="${colors[0]}" opacity="0.9"/>
+  <path d="M234 530 C308 442 458 442 534 530" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" opacity="0.68"/>
+  <path d="M244 408 C316 494 454 494 526 408" fill="none" stroke="${colors[2]}" stroke-width="16" stroke-linecap="round" opacity="0.7"/>
+</g>
+<text x="70" y="94" font-family="Arial, sans-serif" font-size="18" font-weight="800" fill="#ffffff" opacity="0.76">BOOKCONNECT GENERATED COVER</text>
+<text font-family="Georgia, serif" font-size="38" font-weight="700" fill="#ffffff">${titleMarkup}</text>
+${keywordMarkup}
+<rect x="70" y="794" width="180" height="4" rx="2" fill="#ffffff" opacity="0.82"/>
+<text font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#ffffff" opacity="0.88">${taglineMarkup}</text>
+<circle cx="592" cy="866" r="22" fill="${colors[0]}"/>
+<circle cx="642" cy="866" r="22" fill="${colors[1]}"/>
+<circle cx="692" cy="866" r="22" fill="${colors[2]}"/>
+</svg>`;
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function normalizePalette(palette: string[]) {
+  const valid = (Array.isArray(palette) ? palette : [])
+    .filter((color) => /^#[0-9a-fA-F]{6}$/.test(color))
+    .slice(0, 4);
+  return [...valid, "#0f172a", "#38546b", "#ffffff", "#c46a2b"].slice(0, 4);
+}
+
+function wrapSvgText(value: string, maxChars: number, maxLines: number) {
+  const words = value.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  });
+
+  if (current) lines.push(current);
+  const limited = lines.slice(0, maxLines);
+  if (lines.length > maxLines && limited.length > 0) {
+    limited[limited.length - 1] = `${limited[limited.length - 1].replace(/\.*$/, "")}...`;
+  }
+
+  return limited.length ? limited : ["Untitled"];
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return hash;
 }
 
 export async function findMovieMatches(

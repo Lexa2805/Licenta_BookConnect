@@ -5,7 +5,7 @@ import { Input } from "../ui/Input";
 import { ThemeToggle } from "../theme/ThemeToggle";
 import { useSession, signOut } from "next-auth/react";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { canReadLibrary } from "@/lib/roles";
 
@@ -14,11 +14,43 @@ export function Topbar() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const username =
     session?.user?.username || session?.user?.email?.split("@")[0] || "BookConnect";
   const initials = username.substring(0, 2).toUpperCase();
   const searchLibrary = canReadLibrary(session?.user?.role);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAvatar() {
+      if (!session?.user?.id) {
+        setAvatarUrl("");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/me", { cache: "no-store" });
+        if (!response.ok) return;
+        const profile = await response.json();
+
+        if (!cancelled) {
+          setAvatarUrl(profile?.profile?.avatar_url || "");
+          setAvatarFailed(false);
+        }
+      } catch {
+        if (!cancelled) setAvatarUrl("");
+      }
+    }
+
+    loadAvatar();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -76,9 +108,20 @@ export function Topbar() {
           <div className="relative">
             <button 
               onClick={() => setMenuOpen(!menuOpen)}
-              className="w-10 h-10 rounded-full bg-bc-primary-grad text-white grid place-items-center font-semibold text-[13px] shadow-bc-primary hover:scale-105 transition-transform"
+              className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-bc-primary-grad text-[13px] font-semibold text-white shadow-bc-primary transition-transform hover:scale-105"
+              aria-label="Open profile menu"
+              title={username}
             >
-              {initials}
+              {avatarUrl && !avatarFailed ? (
+                <img
+                  src={avatarUrl}
+                  alt={`${username} avatar`}
+                  className="h-full w-full object-cover"
+                  onError={() => setAvatarFailed(true)}
+                />
+              ) : (
+                initials
+              )}
             </button>
 
             {menuOpen && (

@@ -55,15 +55,26 @@ export default function PublicManuscriptsPage() {
               key={manuscript.id}
               className="bc-card bc-card-hover flex min-h-[250px] flex-col gap-5 p-5"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-4">
+                {manuscript.cover_url ? (
+                  <img
+                    src={manuscript.cover_url}
+                    alt=""
+                    className="h-32 w-20 shrink-0 rounded-bc-md border border-bc-border object-cover shadow-bc-sm"
+                  />
+                ) : (
+                  <div className="grid h-32 w-20 shrink-0 place-items-center rounded-bc-md bg-bc-primary-soft text-bc-primary">
+                    <FileText size={24} />
+                  </div>
+                )}
                 <div className="min-w-0">
                   <Badge variant="soft">Public manuscript</Badge>
                   <h2 className="mt-3 line-clamp-2 font-display text-2xl font-semibold leading-tight text-bc-text">
                     {manuscript.title}
                   </h2>
-                </div>
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-bc-md bg-bc-primary-soft text-bc-primary">
-                  <FileText size={20} />
+                  <p className="mt-1 truncate text-sm font-semibold text-bc-subtext">
+                    by {manuscript.author_name || "Unknown author"}
+                  </p>
                 </div>
               </div>
 

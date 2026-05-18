@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { ObjectId } from "mongodb";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/mongodb";
-import { normalizeRole } from "@/lib/roles";
+import { isSelectableAccountRole, normalizeRole } from "@/lib/roles";
 import { cloudinaryImageUrl, uploadImageToCloudinary } from "@/lib/server/cloudinary";
 
 export const runtime = "nodejs";
@@ -84,6 +84,7 @@ export async function PATCH(request: Request) {
     const email = cleanText(form.get("email"), 120).toLowerCase();
     const about = cleanText(form.get("about"), 260);
     const avatarUrl = cleanText(form.get("avatar_url"), 20000);
+    const role = cleanText(form.get("role"), 20);
     const avatarFile = form.get("avatar");
 
     if (!username || !email) {
@@ -92,6 +93,10 @@ export async function PATCH(request: Request) {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ detail: "Enter a valid email address." }, { status: 400 });
+    }
+
+    if (role && !isSelectableAccountRole(role)) {
+      return NextResponse.json({ detail: "Choose reader, writer, or both." }, { status: 400 });
     }
 
     const userId = new ObjectId(session.user.id);
@@ -131,6 +136,7 @@ export async function PATCH(request: Request) {
     const update: Record<string, string> = {
       username,
       email,
+      role: role ? normalizeRole(role) : normalizeRole(session.user.role),
       "profile.about": about,
       updated_at: new Date().toISOString(),
     };

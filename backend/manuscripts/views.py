@@ -124,6 +124,14 @@ class ManuscriptViewSet(viewsets.ViewSet):
         if not author_id:
             logger.warning("manuscript.publish validation_errors=%s", {'author_id': 'This field is required for publishing.'})
             return Response({'author_id': 'This field is required for publishing.'}, status=status.HTTP_400_BAD_REQUEST)
+        current = mongo_service.get_manuscript(pk, author_id=author_id)
+        if not current:
+            return Response({'detail': 'Manuscript not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if not (current.get('title') or '').strip() or not (current.get('author_name') or '').strip():
+            return Response(
+                {'detail': 'Add a manuscript title and author name before publishing.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         manuscript = mongo_service.update_manuscript(pk, {'status': 'PUBLISHED'}, author_id=author_id)
         if not manuscript:
             return Response({'detail': 'Manuscript not found.'}, status=status.HTTP_404_NOT_FOUND)
