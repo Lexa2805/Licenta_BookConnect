@@ -5,6 +5,7 @@ import { Flame } from "lucide-react";
 import { NAV_ITEMS, type NavKey } from "@/lib/nav";
 import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
+import { BookLogoMark } from "@/components/brand/BookLogoMark";
 import { libraryService } from "@/lib/services/library";
 import { canReadLibrary, hasCapability } from "@/lib/roles";
 
@@ -31,8 +32,8 @@ export function Sidebar({ active }: { active: NavKey }) {
     <aside className="hidden lg:flex flex-col w-64 shrink-0 h-screen sticky top-0 px-5 py-6 border-r border-bc-border bg-bc-bg">
       {/* Brand */}
       <Link href="/" className="flex items-center gap-3 mb-8 group">
-        <div className="w-10 h-10 rounded-bc-md bg-bc-primary-grad grid place-items-center text-white shadow-bc-primary group-hover:scale-105 transition-transform duration-300 ease-bc-ease">
-          <BookGlyph />
+        <div className="group-hover:scale-105 transition-transform duration-300 ease-bc-ease">
+          <BookLogoMark size="sm" />
         </div>
         <div className="leading-tight">
           <div className="font-display text-[18px] font-bold text-bc-text">
@@ -85,23 +86,5 @@ export function Sidebar({ active }: { active: NavKey }) {
         </div>
       )}
     </aside>
-  );
-}
-
-function BookGlyph() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
   );
 }

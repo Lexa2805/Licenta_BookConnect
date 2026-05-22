@@ -112,6 +112,12 @@ export const marketplaceService = {
         return response.data;
     },
 
+    deleteReview: async (reviewId: string | number, userId: string): Promise<void> => {
+        await api.delete(`/api/marketplace/reviews/${reviewId}/`, {
+            params: { user_id: userId },
+        });
+    },
+
     getPayouts: async () => {
         const response = await api.get("/api/marketplace/payouts/");
         return response.data;

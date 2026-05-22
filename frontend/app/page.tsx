@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BookOpen, LayoutGrid, Store } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { PageLayout } from "@/components/layout/PageLayout";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Hero } from "@/components/home/Hero";
 import { ReadingCalendarMini } from "@/components/home/ReadingCalendarMini";
 import { Recommended } from "@/components/home/Recommended";
@@ -30,9 +31,13 @@ export default function HomePage() {
           <Hero />
           <ReadingCalendarMini />
           <Recommended />
+          <SiteFooter />
         </>
       ) : (
-        <WriterHome />
+        <>
+          <WriterHome />
+          <SiteFooter />
+        </>
       )}
     </PageLayout>
   );

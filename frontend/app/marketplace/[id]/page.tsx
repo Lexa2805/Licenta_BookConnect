@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { Trash2 } from "lucide-react";
 import { marketplaceService, Listing, Review } from "@/lib/services/marketplace";
 import Link from "next/link";
 
@@ -48,6 +49,7 @@ export default function BookDetailPage() {
     const [isWishlisted, setIsWishlisted] = useState(false);
     const [wishlistLoading, setWishlistLoading] = useState(false);
     const [buying, setBuying] = useState(false);
+    const [deletingReviewId, setDeletingReviewId] = useState<string | number | null>(null);
 
     useEffect(() => {
         if (id) {
@@ -196,6 +198,26 @@ export default function BookDetailPage() {
             alert(error instanceof Error ? error.message : "Could not update wishlist. Please try again.");
         } finally {
             setWishlistLoading(false);
+        }
+    };
+
+    const handleDeleteReview = async (review: Review) => {
+        if (!session?.user?.id) {
+            router.push("/login");
+            return;
+        }
+
+        const confirmed = window.confirm("Delete this review?");
+        if (!confirmed) return;
+
+        setDeletingReviewId(review.id);
+        try {
+            await marketplaceService.deleteReview(review.id, session.user.id);
+            await loadListing();
+        } catch (error) {
+            alert(error instanceof Error ? error.message : "Could not delete review.");
+        } finally {
+            setDeletingReviewId(null);
         }
     };
 
@@ -508,7 +530,22 @@ export default function BookDetailPage() {
                                             </p>
                                         </div>
                                     </div>
-                                    {renderStars(review.rating)}
+                                    <div className="flex items-center gap-2">
+                                        {renderStars(review.rating)}
+                                        {session?.user?.id &&
+                                            (review.user_id === session.user.id || listing.seller_id === session.user.id) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteReview(review)}
+                                                    disabled={deletingReviewId === review.id}
+                                                    className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30"
+                                                    aria-label="Delete review"
+                                                    title="Delete review"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
+                                    </div>
                                 </div>
                                 <p className="text-amber-800 dark:text-amber-200">
                                     {review.comment}

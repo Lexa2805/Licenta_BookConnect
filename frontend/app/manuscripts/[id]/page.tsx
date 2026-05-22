@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Highlighter, Loader2, MessageSquare, Send } from "lucide-react";
+import { ArrowLeft, Highlighter, Loader2, MessageSquare, Send, Trash2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +28,7 @@ export default function PublicManuscriptReaderPage() {
 
   const [selectedText, setSelectedText] = useState("");
   const [comment, setComment] = useState("");
+  const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | number | null>(null);
 
   const { data: manuscript, isLoading, error } = useQuery({
     queryKey: ["public-manuscript", manuscriptId],
@@ -65,6 +66,24 @@ export default function PublicManuscriptReaderPage() {
     event.preventDefault();
     if (!comment.trim()) return;
     feedbackMutation.mutate();
+  }
+
+  async function handleDeleteFeedback(feedbackId: string | number) {
+    if (!session?.user?.id) return;
+
+    const confirmed = window.confirm("Delete this feedback?");
+    if (!confirmed) return;
+
+    setDeletingFeedbackId(feedbackId);
+    try {
+      await manuscriptsService.deleteFeedback(manuscriptId, feedbackId, session.user.id);
+      queryClient.invalidateQueries({ queryKey: ["public-manuscript", manuscriptId] });
+      queryClient.invalidateQueries({ queryKey: ["public-manuscripts"] });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not delete feedback.");
+    } finally {
+      setDeletingFeedbackId(null);
+    }
   }
 
   if (isLoading) {
@@ -239,9 +258,24 @@ export default function PublicManuscriptReaderPage() {
                       <span className="text-sm font-semibold text-bc-text">
                         {item.user_name}
                       </span>
-                      <span className="text-[11px] text-bc-subtext">
-                        {formatDate(item.created_at)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-bc-subtext">
+                          {formatDate(item.created_at)}
+                        </span>
+                        {session?.user?.id &&
+                          (item.user_id === session.user.id || manuscript.author_id === session.user.id) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteFeedback(item.id)}
+                              disabled={deletingFeedbackId === item.id}
+                              className="grid h-7 w-7 place-items-center rounded-bc-md border border-bc-border bg-bc-surface text-bc-danger transition hover:border-bc-danger hover:bg-bc-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label="Delete feedback"
+                              title="Delete feedback"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                      </div>
                     </div>
                     {item.selected_text && (
                       <blockquote className="mb-2 border-l-2 border-bc-primary pl-3 text-xs leading-5 text-bc-subtext">

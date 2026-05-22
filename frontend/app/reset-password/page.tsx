@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { BookLogoMark } from "@/components/brand/BookLogoMark";
 import { Button } from "@/components/ui/Button";
 
 type ResetRequestResponse = {
@@ -92,19 +94,10 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <main className="min-h-screen bg-bc-bg flex items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="bc-orb bc-orb-primary w-96 h-96 -top-20 -right-20 mix-blend-multiply animate-pulse" />
-        <div className="bc-orb bc-orb-secondary w-96 h-96 -bottom-20 -left-20 mix-blend-multiply animate-pulse delay-1000" />
-      </div>
-
-      <div className="w-full max-w-md relative z-10">
-        <div className="bc-card p-8">
+    <AuthShell>
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-bc-primary-grad rounded-2xl mb-4 shadow-bc-primary">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586l6.257-6.257A6 6 0 1121 9z" />
-              </svg>
+            <div className="mb-4 flex justify-center">
+              <BookLogoMark size="lg" />
             </div>
             <h1 className="text-3xl font-bold text-bc-text mb-2">
               Reset Password
@@ -206,8 +199,6 @@ export default function ResetPasswordPage() {
               Sign in
             </button>
           </p>
-        </div>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

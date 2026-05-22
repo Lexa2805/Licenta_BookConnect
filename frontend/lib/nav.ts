@@ -4,6 +4,7 @@ import {
   FileText,
   Store,
   LayoutGrid,
+  Settings,
   Users,
   User,
   type LucideIcon,
@@ -17,6 +18,7 @@ export type NavKey =
   | "marketplace"
   | "studio"
   | "community"
+  | "settings"
   | "profile";
 
 export interface NavItem {
@@ -34,5 +36,6 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "marketplace", label: "Marketplace", href: "/marketplace", Icon: Store },
   { key: "studio", label: "Studio", href: "/studio", Icon: LayoutGrid, requiredCapability: "write" },
   { key: "community", label: "Community", href: "/community", Icon: Users, requiredCapability: "read" },
+  { key: "settings", label: "Settings", href: "/settings", Icon: Settings },
   { key: "profile", label: "Profile", href: "/profile", Icon: User },
 ];

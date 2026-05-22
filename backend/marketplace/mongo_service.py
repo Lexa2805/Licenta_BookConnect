@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from content_moderation import mask_profanity
 from mongo_client import get_collection, serialize_document, to_object_id
 from pymongo import ReturnDocument
 from upload_storage import cloudinary_image_url
@@ -275,9 +276,29 @@ def create_review(data):
         "user_id": data.get("user_id") or "anonymous_user",
         "user_name": data.get("user_name") or "Anonymous",
         "rating": _as_int(data.get("rating"), 5),
-        "comment": data.get("comment") or "",
+        "comment": mask_profanity(data.get("comment") or ""),
         "created_at": _now(),
     }
     result = get_collection(REVIEWS).insert_one(document)
     document["_id"] = result.inserted_id
     return serialize_document(document), result.inserted_id
+
+
+def delete_review(review_id, user_id=None):
+    object_id = to_object_id(review_id)
+    if object_id is None:
+        return False
+
+    review = get_collection(REVIEWS).find_one({"_id": object_id})
+    if not review:
+        return False
+
+    if user_id:
+        listing = get_listing(review.get("listing"))
+        is_review_author = str(review.get("user_id") or "") == str(user_id)
+        is_listing_owner = bool(listing and str(listing.get("seller_id") or "") == str(user_id))
+        if not is_review_author and not is_listing_owner:
+            return False
+
+    result = get_collection(REVIEWS).delete_one({"_id": object_id})
+    return bool(result.deleted_count)

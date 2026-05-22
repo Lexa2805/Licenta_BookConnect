@@ -2,6 +2,7 @@ from rest_framework import views, status
 from rest_framework.response import Response
 from django.http import Http404
 from mongoengine.errors import DoesNotExist
+from content_moderation import mask_profanity
 from .serializers import ReviewCreateSerializer
 from .models_mongo import Review
 from books.models_mongo import Book
@@ -20,7 +21,7 @@ class ReviewCreateView(views.APIView):
             book_id=v["book_id"],
             user_id=str(getattr(request.user, "id", "anon")),
             rating=v["rating"],
-            body=v.get("body", ""),
+            body=mask_profanity(v.get("body", "")),
         )
         r.save()
         return Response({"id": str(r.id)}, status=status.HTTP_201_CREATED)

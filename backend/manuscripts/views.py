@@ -156,3 +156,12 @@ class ManuscriptViewSet(viewsets.ViewSet):
         feedback, inserted_id = mongo_service.create_feedback(pk, request.data)
         logger.info("manuscript.feedback inserted_mongodb_id=%s", inserted_id)
         return Response(feedback, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'], url_path=r'feedback/(?P<feedback_id>[^/.]+)')
+    def delete_feedback(self, request, pk=None, feedback_id=None):
+        user_id = request.query_params.get('user_id') or request.data.get('user_id')
+        if not user_id:
+            return Response({'detail': 'user_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not mongo_service.delete_feedback(pk, feedback_id, user_id=user_id):
+            return Response({'detail': 'Feedback not found or you cannot delete it.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)

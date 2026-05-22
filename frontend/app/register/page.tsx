@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { BookLogoMark } from "@/components/brand/BookLogoMark";
 import { Button } from "@/components/ui/Button";
 import type { SelectableAccountRole } from "@/lib/roles";
 
@@ -45,21 +47,11 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-bc-bg flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="bc-orb bc-orb-primary w-96 h-96 -top-20 -right-20 mix-blend-multiply animate-pulse"></div>
-        <div className="bc-orb bc-orb-secondary w-96 h-96 -bottom-20 -left-20 mix-blend-multiply animate-pulse delay-1000"></div>
-      </div>
-
-      <div className="w-full max-w-md relative z-10">
-        <div className="bc-card p-8">
+    <AuthShell>
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-bc-primary-grad rounded-2xl mb-4 shadow-bc-primary">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-              </svg>
+            <div className="mb-4 flex justify-center">
+              <BookLogoMark size="lg" />
             </div>
             <h1 className="text-3xl font-bold text-bc-text mb-2">Create Account</h1>
             <p className="text-bc-subtext">Join BookConnect today</p>
@@ -158,8 +150,6 @@ export default function RegisterPage() {
               Sign in
             </button>
           </p>
-        </div>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

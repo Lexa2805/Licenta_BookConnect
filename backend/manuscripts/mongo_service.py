@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from content_moderation import mask_profanity
 from mongo_client import get_collection, serialize_document, to_object_id
 from pymongo import ReturnDocument
 
@@ -178,9 +179,32 @@ def create_feedback(manuscript_id, data):
         "user_id": data.get("user_id") or "anonymous_user",
         "user_name": data.get("user_name") or "Anonymous",
         "selected_text": data.get("selected_text") or "",
-        "comment": data.get("comment") or "",
+        "comment": mask_profanity(data.get("comment") or ""),
         "created_at": _now(),
     }
     result = get_collection(FEEDBACK_COLLECTION).insert_one(document)
     document["_id"] = result.inserted_id
     return _serialize_feedback(document), result.inserted_id
+
+
+def delete_feedback(manuscript_id, feedback_id, user_id=None):
+    object_id = to_object_id(feedback_id)
+    if object_id is None:
+        return False
+
+    feedback = get_collection(FEEDBACK_COLLECTION).find_one({
+        "_id": object_id,
+        "manuscript": str(manuscript_id),
+    })
+    if not feedback:
+        return False
+
+    if user_id:
+        manuscript = get_manuscript(manuscript_id)
+        is_feedback_author = str(feedback.get("user_id") or "") == str(user_id)
+        is_manuscript_author = bool(manuscript and str(manuscript.get("author_id") or "") == str(user_id))
+        if not is_feedback_author and not is_manuscript_author:
+            return False
+
+    result = get_collection(FEEDBACK_COLLECTION).delete_one({"_id": object_id})
+    return bool(result.deleted_count)

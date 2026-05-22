@@ -1,6 +1,7 @@
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_API_KEY = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ?? "";
-const AI_MODEL = "google/gemini-2.5-flash";
+const AI_MODEL =
+  process.env.NEXT_PUBLIC_OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
 
 export interface BookmarkSuggestion {
   note: string;

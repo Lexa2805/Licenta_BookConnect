@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Edit3, MapPin, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Loader2, Settings } from "lucide-react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/Button";
 import { SectionHeader } from "@/components/ui/SectionTitle";
@@ -48,10 +48,10 @@ export default function ProfilePage() {
       headerActions={
         <Button
           variant="secondary"
-          leftIcon={<Edit3 size={14} />}
+          leftIcon={<Settings size={14} />}
           onClick={() => router.push("/settings")}
         >
-          Edit profile
+          Settings
         </Button>
       }
     >

@@ -79,4 +79,13 @@ export const manuscriptsService = {
         const response = await api.post(`/api/manuscripts/${id}/feedback/`, data);
         return response.data;
     },
+    deleteFeedback: async (
+        manuscriptId: string | number,
+        feedbackId: string | number,
+        userId: string,
+    ): Promise<void> => {
+        await api.delete(`/api/manuscripts/${manuscriptId}/feedback/${feedbackId}/`, {
+            params: { user_id: userId },
+        });
+    },
 };

@@ -173,6 +173,14 @@ class ReviewViewSet(viewsets.ViewSet):
         logger.info("marketplace.review.create inserted_mongodb_id=%s", inserted_id)
         return Response(review, status=status.HTTP_201_CREATED)
 
+    def destroy(self, request, pk=None):
+        user_id = request.query_params.get('user_id') or request.data.get('user_id')
+        if not user_id:
+            return Response({'detail': 'user_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not mongo_service.delete_review(pk, user_id=user_id):
+            return Response({'detail': 'Review not found or you cannot delete it.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class PayoutViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Payout.objects.all()
