@@ -29,3 +29,4 @@ class ReadingSessionAdmin(admin.ModelAdmin):
     list_display = ['user_id', 'book', 'started_at', 'ended_at', 'pages_read']
     list_filter = ['started_at']
     search_fields = ['user_id', 'book__title']
+

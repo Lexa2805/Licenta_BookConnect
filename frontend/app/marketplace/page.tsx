@@ -17,6 +17,7 @@ const FILTERS = ["All", "Wishlist", "Swap-friendly", "Under 10 Lei", "Like new",
 
 export default function MarketplacePage() {
   const [filter, setFilter] = useState("All");
+  const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
   const { data: session } = useSession();
 
@@ -50,6 +51,14 @@ export default function MarketplacePage() {
 
   const sourceListings = filter === "Wishlist" ? wishlist : listings;
   const filteredListings = sourceListings.filter((book) => {
+    const query = searchTerm.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      [book.title, book.author, String(book.id), book._id]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+
+    if (!matchesSearch) return false;
     if (filter === "All") return true;
     if (filter === "Wishlist") return true;
     if (filter === "Under 10 Lei") return parseFloat(book.price) < 10;
@@ -69,6 +78,8 @@ export default function MarketplacePage() {
         <Input
           placeholder="Search by title, author, or ISBN..."
           leftIcon={<Search size={16} />}
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
         />
         <div className="flex flex-wrap gap-2">
           {FILTERS.map((f) => (

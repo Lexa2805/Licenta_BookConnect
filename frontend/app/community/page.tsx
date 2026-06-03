@@ -329,7 +329,7 @@ export default function CommunityPage() {
 
   async function handleCreateGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
+    
     const name = groupName.trim();
     const description = groupDescription.trim();
 
